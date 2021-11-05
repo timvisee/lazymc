@@ -1,0 +1,8 @@
+[package]
+name = "mc-idle"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+tokio = { version = "1", features = ["full"] }
