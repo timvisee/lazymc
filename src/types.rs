@@ -1,5 +1,9 @@
-/// Try to read var-int from data stream.
-pub fn read_var_int(buf: &mut [u8]) -> Result<(usize, i32), ()> {
+use std::io::Read;
+
+use bytes::BytesMut;
+
+/// Try to read var-int from data buffer.
+pub fn read_var_int(buf: &[u8]) -> Result<(usize, i32), ()> {
     for len in 1..=5.min(buf.len()) {
         // Find var-int byte size
         let extra_byte = (buf[len - 1] & (1 >> 7)) > 0;
@@ -8,7 +12,7 @@ pub fn read_var_int(buf: &mut [u8]) -> Result<(usize, i32), ()> {
         }
 
         // Select var-int bytes
-        let buf = &mut buf[..len];
+        let buf = &buf[..len];
 
         // Parse var-int, return result
         return match minecraft_protocol::decoder::var_int::decode(&mut buf.as_ref()) {

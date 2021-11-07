@@ -1,5 +1,60 @@
 use crate::types;
 
+pub const STATUS_PACKET_ID_STATUS: i32 = 0;
+pub const STATUS_PACKET_ID_PING: i32 = 1;
+
+/// Client state.
+// TODO: add encryption/compression state
+#[derive(Debug, Default)]
+pub struct Client {
+    /// Current client state.
+    pub state: ClientState,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ClientState {
+    /// Initial client state.
+    Handshake,
+
+    /// State to query server status.
+    Status,
+
+    /// State to login to server.
+    Login,
+
+    /// State for playing.
+    Play,
+}
+
+impl ClientState {
+    /// From state ID.
+    pub fn from_id(id: i32) -> Option<Self> {
+        match id {
+            // 0 => Self::Handshake,
+            1 => Some(Self::Status),
+            2 => Some(Self::Login),
+            // 2 => Self::Play,
+            _ => None,
+        }
+    }
+
+    /// Get state ID.
+    pub fn to_id(self) -> i32 {
+        match self {
+            Self::Handshake => unimplemented!(),
+            Self::Status => 1,
+            Self::Login => 2,
+            Self::Play => unimplemented!(),
+        }
+    }
+}
+
+impl Default for ClientState {
+    fn default() -> Self {
+        Self::Handshake
+    }
+}
+
 /// Raw Minecraft packet.
 ///
 /// Having a packet ID and a raw data byte array.
@@ -18,14 +73,14 @@ impl RawPacket {
     }
 
     /// Decode packet from raw buffer.
-    pub fn decode(mut buf: &mut [u8]) -> Result<Self, ()> {
+    pub fn decode(mut buf: &[u8]) -> Result<Self, ()> {
         // Read length
         let (read, len) = types::read_var_int(buf)?;
-        buf = &mut buf[read..][..len as usize];
+        buf = &buf[read..][..len as usize];
 
         // Read packet ID, select buf
         let (read, packet_id) = types::read_var_int(buf)?;
-        buf = &mut buf[read..];
+        buf = &buf[read..];
 
         Ok(Self::new(packet_id, buf.to_vec()))
     }
