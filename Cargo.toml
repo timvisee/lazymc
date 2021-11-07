@@ -5,6 +5,6 @@ edition = "2018"
 
 [dependencies]
 bytes = "1.1"
-futures = "0.3"
+futures = { version = "0.3", default-features = false }
 minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "c578492" }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync"] }
