@@ -1,4 +1,5 @@
 pub mod config;
+pub mod monitor;
 pub mod protocol;
 pub mod types;
 
@@ -25,12 +26,18 @@ use protocol::{Client, ClientState, RawPacket};
 async fn main() -> Result<(), ()> {
     println!(
         "Proxying public {} to internal {}",
-        ADDRESS_PUBLIC, ADDRESS_PROXY
+        ADDRESS_PUBLIC, ADDRESS_PROXY,
     );
+
+    let server_state = monitor::ServerState::default().shared();
 
     // Listen for new connections
     // TODO: do not drop error here
     let listener = TcpListener::bind(ADDRESS_PUBLIC).await.map_err(|_| ())?;
+
+    // Spawn server monitor
+    let addr = ADDRESS_PROXY.parse().expect("invalid server IP");
+    tokio::spawn(monitor::monitor_server(addr, server_state));
 
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
@@ -53,7 +60,7 @@ async fn main() -> Result<(), ()> {
 }
 
 /// Read raw packet from stream.
-async fn read_packet<'a>(
+pub async fn read_packet<'a>(
     buf: &mut BytesMut,
     stream: &mut ReadHalf<'a>,
 ) -> Result<Option<(RawPacket, Vec<u8>)>, ()> {
@@ -113,7 +120,7 @@ async fn proxy(client: Client, mut inbound: TcpStream, addr_target: String) -> R
 
     let (client_send_queue, mut client_to_send) = unbounded_channel::<Vec<u8>>();
 
-    let server_available = false;
+    let server_available = true;
 
     let client_to_server = async {
         // Incoming buffer

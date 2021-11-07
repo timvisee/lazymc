@@ -1,6 +1,6 @@
 # lazymc
 
-`lazymc` puts your Minecraft server at rest when idle, and wakes it up when
+`lazymc` puts your Minecraft server to rest when idle, and wakes it up when
 players connect.
 
 ## License
