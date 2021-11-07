@@ -23,4 +23,4 @@ bytes = "1.1"
 futures = { version = "0.3", default-features = false }
 minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "c578492" }
 rand = "0.8"
-tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "sync", "time"] }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "time"] }
