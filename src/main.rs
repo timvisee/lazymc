@@ -1,7 +1,8 @@
-pub mod config;
-pub mod monitor;
-pub mod protocol;
-pub mod types;
+pub(crate) mod config;
+pub(crate) mod monitor;
+pub(crate) mod protocol;
+pub(crate) mod server;
+pub(crate) mod types;
 
 use std::sync::Arc;
 
@@ -19,11 +20,10 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::process::Command;
 
 use config::*;
-use monitor::ServerState;
 use protocol::{Client, ClientState, RawPacket};
+use server::ServerState;
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
@@ -32,7 +32,7 @@ async fn main() -> Result<(), ()> {
         ADDRESS_PUBLIC, ADDRESS_PROXY,
     );
 
-    let server_state = monitor::ServerState::default().shared();
+    let server_state = Arc::new(ServerState::default());
 
     // Listen for new connections
     // TODO: do not drop error here
@@ -41,6 +41,17 @@ async fn main() -> Result<(), ()> {
     // Spawn server monitor
     let addr = ADDRESS_PROXY.parse().expect("invalid server IP");
     tokio::spawn(monitor::monitor_server(addr, server_state.clone()));
+
+    let sub = server_state.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::signal::ctrl_c().await.unwrap();
+            if !sub.kill_server() {
+                // TODO: gracefully kill itself instead
+                std::process::exit(1)
+            }
+        }
+    });
 
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
@@ -164,7 +175,7 @@ async fn status_server(
             // Start server if not starting yet
             if !server.starting() {
                 server.set_starting(true);
-                tokio::spawn(start_server(server).map(|_| ()));
+                tokio::spawn(server::start(server).map(|_| ()));
             }
 
             break;
@@ -223,10 +234,10 @@ async fn status_server(
             continue;
         }
 
-        // Show unhandled packet warning
-        eprintln!("Received unhandled packet:");
-        eprintln!("- State: {:?}", client.state());
-        eprintln!("- Packet ID: {}", packet.id);
+        // // Show unhandled packet warning
+        // eprintln!("Received unhandled packet:");
+        // eprintln!("- State: {:?}", client.state());
+        // eprintln!("- Packet ID: {}", packet.id);
     }
 
     // Gracefully close connection
@@ -256,21 +267,6 @@ async fn proxy(mut inbound: TcpStream, addr_target: String) -> Result<(), ()> {
     };
 
     tokio::try_join!(client_to_server, server_to_client)?;
-
-    Ok(())
-}
-
-/// Start Minecraft server.
-async fn start_server(state: Arc<ServerState>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::new(SERVER_CMD);
-
-    let status = cmd.status().await?;
-
-    println!("Server exited, status: {}", status);
-
-    // Reset online and starting state
-    state.set_online(false);
-    state.set_starting(false);
 
     Ok(())
 }

@@ -8,7 +8,7 @@ pub(crate) const ADDRESS_PUBLIC: &str = "127.0.0.1:9090";
 pub(crate) const ADDRESS_PROXY: &str = "127.0.0.1:9091";
 
 /// Server description shown when server is starting.
-pub(crate) const LABEL_SERVER_SLEEPING: &str = "☠ Server is sleeping...\n§2☻ Join to start it up";
+pub(crate) const LABEL_SERVER_SLEEPING: &str = "☠ Server is sleeping\n§2☻ Join to start it up";
 
 /// Server description shown when server is starting.
 pub(crate) const LABEL_SERVER_STARTING: &str = "§2☻ Server is starting...\n§7⌛ Please wait...";

@@ -21,6 +21,7 @@ edition = "2021"
 [dependencies]
 bytes = "1.1"
 futures = { version = "0.3", default-features = false }
+libc = "0.2"
 minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "c578492" }
 rand = "0.8"
-tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "time", "process"] }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "time", "process", "signal"] }

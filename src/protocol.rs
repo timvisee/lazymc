@@ -46,10 +46,10 @@ impl ClientState {
     /// From state ID.
     pub fn from_id(id: i32) -> Option<Self> {
         match id {
-            // 0 => Self::Handshake,
+            0 => Some(Self::Handshake),
             1 => Some(Self::Status),
             2 => Some(Self::Login),
-            // 2 => Self::Play,
+            3 => Some(Self::Play),
             _ => None,
         }
     }
@@ -57,10 +57,10 @@ impl ClientState {
     /// Get state ID.
     pub fn to_id(self) -> i32 {
         match self {
-            Self::Handshake => unimplemented!(),
+            Self::Handshake => 0,
             Self::Status => 1,
             Self::Login => 2,
-            Self::Play => unimplemented!(),
+            Self::Play => 3,
         }
     }
 }

@@ -1,7 +1,6 @@
 // TODO: remove all unwraps/expects here!
 
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,6 +14,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::protocol::{self, ClientState, RawPacket};
+use crate::server::ServerState;
 
 /// Minecraft protocol version used when polling server status.
 const PROTOCOL_VERSION: i32 = 754;
@@ -24,43 +24,6 @@ const MONITOR_PING_INTERVAL: u64 = 2;
 
 /// Ping timeout in seconds.
 const PING_TIMEOUT: u64 = 8;
-
-/// Shared server state.
-#[derive(Default, Debug)]
-pub struct ServerState {
-    /// Whether the server is online.
-    online: AtomicBool,
-
-    /// Whether the server is starting.
-    starting: AtomicBool,
-}
-
-impl ServerState {
-    /// Transform into shared instance.
-    pub fn shared(self) -> Arc<Self> {
-        Arc::new(self)
-    }
-
-    /// Whether the server is online.
-    pub fn online(&self) -> bool {
-        self.online.load(Ordering::Relaxed)
-    }
-
-    /// Set whether the server is online.
-    pub fn set_online(&self, online: bool) {
-        self.online.store(online, Ordering::Relaxed)
-    }
-
-    /// Whether the server is starting.
-    pub fn starting(&self) -> bool {
-        self.starting.load(Ordering::Relaxed)
-    }
-
-    /// Set whether the server is starting.
-    pub fn set_starting(&self, starting: bool) {
-        self.starting.store(starting, Ordering::Relaxed)
-    }
-}
 
 /// Poll server state.
 ///
