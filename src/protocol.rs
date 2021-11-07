@@ -4,6 +4,7 @@ use crate::types;
 
 pub const STATUS_PACKET_ID_STATUS: i32 = 0;
 pub const STATUS_PACKET_ID_PING: i32 = 1;
+pub const LOGIN_PACKET_ID_LOGIN_START: i32 = 0;
 
 /// Client state.
 // TODO: add encryption/compression state

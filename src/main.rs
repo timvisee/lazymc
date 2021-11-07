@@ -9,6 +9,7 @@ use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
+use minecraft_protocol::version::v1_14_4::login::LoginDisconnect;
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::io;
 use tokio::io::AsyncReadExt;
@@ -34,12 +35,15 @@ async fn main() -> Result<(), ()> {
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
         let client = Client::default();
-        eprintln!("New client");
+        eprintln!("Client connected");
 
         let transfer = proxy(client, inbound, ADDRESS_PROXY.to_string()).map(|r| {
             if let Err(e) = r {
                 println!("Failed to proxy: {:?}", e);
             }
+
+            // TODO: proxy isn't closed for disconnected clients!
+            eprintln!("Client disconnected");
         });
 
         tokio::spawn(transfer);
@@ -109,13 +113,15 @@ async fn proxy(client: Client, mut inbound: TcpStream, addr_target: String) -> R
 
     let (client_send_queue, mut client_to_send) = unbounded_channel::<Vec<u8>>();
 
+    let server_available = false;
+
     let client_to_server = async {
         // Incoming buffer
         let mut buf = BytesMut::new();
 
         loop {
             // In login state, proxy raw data
-            if client.state() == ClientState::Login {
+            if server_available && client.state() == ClientState::Login {
                 eprintln!("STARTED FULL PROXY");
 
                 wo.writable().await.map_err(|_| ())?;
@@ -148,6 +154,25 @@ async fn proxy(client: Client, mut inbound: TcpStream, addr_target: String) -> R
             eprintln!("PACKET {:?}", raw.as_slice());
             eprintln!("PACKET ID: {}", packet.id);
             eprintln!("PACKET DATA: {:?}", packet.data);
+
+            // Hijack login start
+            if client.state() == ClientState::Login
+                && packet.id == protocol::LOGIN_PACKET_ID_LOGIN_START
+            {
+                let packet = LoginDisconnect {
+                    reason: Message::new(Payload::text(LABEL_SERVER_STARTING_MESSAGE)),
+                };
+
+                let mut data = Vec::new();
+                packet.encode(&mut data).map_err(|_| ())?;
+
+                let response = RawPacket::new(0, data).encode()?;
+                client_send_queue
+                    .send(response)
+                    .expect("failed to queue logout response");
+
+                break;
+            }
 
             // Hijack handshake
             if client.state() == ClientState::Handshake

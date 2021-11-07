@@ -5,7 +5,11 @@ pub const ADDRESS_PUBLIC: &str = "127.0.0.1:9090";
 pub const ADDRESS_PROXY: &str = "127.0.0.1:9091";
 
 /// Server description shown when server is starting.
-pub const LABEL_SERVER_SLEEPING: &str = "Server sleeping...\nJoin to start it up §c♥";
+pub const LABEL_SERVER_SLEEPING: &str = "☠ Server is sleeping...\n§2☻ Join to start it up";
 
 /// Server description shown when server is starting.
-pub const LABEL_SERVER_STARTING: &str = "Server starting...\nPlease wait §c♥";
+pub const LABEL_SERVER_STARTING: &str = "§2☻ Server is starting...\n§7⌛ Please wait...";
+
+/// Kick message shown when user tries to connect to starting server.
+pub const LABEL_SERVER_STARTING_MESSAGE: &str =
+    "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.";
