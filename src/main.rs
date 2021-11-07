@@ -19,6 +19,7 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::process::Command;
 
 use config::*;
 use monitor::ServerState;
@@ -44,7 +45,7 @@ async fn main() -> Result<(), ()> {
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
         let client = Client::default();
-        eprintln!("Client connected");
+        // eprintln!("Client connected");
 
         if !server_state.online() {
             // When server is not online, spawn a status server
@@ -53,8 +54,7 @@ async fn main() -> Result<(), ()> {
                     println!("Failed to proxy: {:?}", e);
                 }
 
-                // TODO: proxy isn't closed for disconnected clients!
-                eprintln!("Client disconnected");
+                // eprintln!("Client disconnected");
             });
 
             tokio::spawn(transfer);
@@ -65,8 +65,7 @@ async fn main() -> Result<(), ()> {
                     println!("Failed to proxy: {:?}", e);
                 }
 
-                // TODO: proxy isn't closed for disconnected clients!
-                eprintln!("Client disconnected");
+                // eprintln!("Client disconnected");
             });
 
             tokio::spawn(transfer);
@@ -161,6 +160,13 @@ async fn status_server(
             let response = RawPacket::new(0, data).encode()?;
 
             writer.write_all(&response).await.map_err(|_| ())?;
+
+            // Start server if not starting yet
+            if !server.starting() {
+                server.set_starting(true);
+                tokio::spawn(start_server(server).map(|_| ()));
+            }
+
             break;
         }
 
@@ -250,6 +256,21 @@ async fn proxy(mut inbound: TcpStream, addr_target: String) -> Result<(), ()> {
     };
 
     tokio::try_join!(client_to_server, server_to_client)?;
+
+    Ok(())
+}
+
+/// Start Minecraft server.
+async fn start_server(state: Arc<ServerState>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::new(SERVER_CMD);
+
+    let status = cmd.status().await?;
+
+    println!("Server exited, status: {}", status);
+
+    // Reset online and starting state
+    state.set_online(false);
+    state.set_starting(false);
 
     Ok(())
 }
