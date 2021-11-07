@@ -1,7 +1,3 @@
-use std::io::Read;
-
-use bytes::BytesMut;
-
 /// Try to read var-int from data buffer.
 pub fn read_var_int(buf: &[u8]) -> Result<(usize, i32), ()> {
     for len in 1..=5.min(buf.len()) {

@@ -1,26 +1,18 @@
-#![allow(unused)]
-
 pub mod config;
 pub mod protocol;
 pub mod types;
 
-use std::error::Error;
-
 use bytes::BytesMut;
-use futures::future::poll_fn;
 use futures::FutureExt;
-use futures::TryFutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
-use minecraft_protocol::version::v1_14_4::status::{PingRequest, PingResponse, StatusResponse};
+use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::io;
-use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
-use tokio::io::ReadBuf;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::unbounded_channel;
@@ -71,7 +63,7 @@ async fn read_packet<'a>(
     while buf.len() < 2 {
         // Read packet from socket
         let mut tmp = Vec::with_capacity(64);
-        stream.read_buf(&mut tmp).await;
+        stream.read_buf(&mut tmp).await.map_err(|_| ())?;
         if tmp.is_empty() {
             return Ok(None);
         }
@@ -92,7 +84,7 @@ async fn read_packet<'a>(
     while buf.len() < consumed + len as usize {
         // Read packet from socket
         let mut tmp = Vec::with_capacity(64);
-        stream.read_buf(&mut tmp).await;
+        stream.read_buf(&mut tmp).await.map_err(|_| ())?;
         if tmp.is_empty() {
             return Ok(None);
         }
@@ -109,7 +101,7 @@ async fn read_packet<'a>(
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
-async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) -> Result<(), ()> {
+async fn proxy(client: Client, mut inbound: TcpStream, addr_target: String) -> Result<(), ()> {
     let mut outbound = TcpStream::connect(addr_target).await.map_err(|_| ())?;
 
     let (mut ri, mut wi) = inbound.split();
@@ -126,7 +118,7 @@ async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) 
             if client.state() == ClientState::Login {
                 eprintln!("STARTED FULL PROXY");
 
-                wo.writable().await;
+                wo.writable().await.map_err(|_| ())?;
 
                 // Forward remaining buffer
                 wo.write_all(&buf).await.map_err(|_| ())?;
@@ -194,10 +186,10 @@ async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) 
                         sample: vec![],
                     },
                 };
-                let server_status = StatusResponse { server_status };
+                let packet = StatusResponse { server_status };
 
                 let mut data = Vec::new();
-                server_status.encode(&mut data).map_err(|_| ())?;
+                packet.encode(&mut data).map_err(|_| ())?;
 
                 let response = RawPacket::new(0, data).encode()?;
                 client_send_queue
@@ -243,18 +235,18 @@ async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) 
                     // }
 
                     // Forward remaining data
-                    client_send_queue.send(buf.to_vec());
+                    client_send_queue.send(buf.to_vec()).map_err(|_| ())?;
                     buf.clear();
 
                     // Keep reading until we have at least 2 bytes
                     loop {
                         // Read packet from socket
                         let mut tmp = Vec::new();
-                        ro.read_buf(&mut tmp).await;
+                        ro.read_buf(&mut tmp).await.map_err(|_| ())?;
                         if tmp.is_empty() {
                             break;
                         }
-                        client_send_queue.send(tmp);
+                        client_send_queue.send(tmp).map_err(|_| ())?;
                     }
 
                     // Forward raw packet to server
@@ -264,7 +256,7 @@ async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) 
                 }
 
                 // Read packet from stream
-                let (packet, raw) = match read_packet(&mut buf, &mut ro).await {
+                let (_packet, raw) = match read_packet(&mut buf, &mut ro).await {
                     Ok(Some(packet)) => packet,
                     Ok(None) => {
                         eprintln!("Closing connection, could not read more");
@@ -272,12 +264,12 @@ async fn proxy(mut client: Client, mut inbound: TcpStream, addr_target: String) 
                     }
                     Err(_) => {
                         // Forward raw packet to server
-                        client_send_queue.send(buf.to_vec());
+                        client_send_queue.send(buf.to_vec()).map_err(|_| ())?;
                         continue;
                     }
                 };
 
-                client_send_queue.send(raw);
+                client_send_queue.send(raw).map_err(|_| ())?;
             }
 
             Ok(())

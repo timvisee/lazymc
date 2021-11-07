@@ -92,11 +92,6 @@ impl RawPacket {
         let (read, len) = types::read_var_int(buf)?;
         buf = &buf[read..][..len as usize];
 
-        Self::decode_data(len, buf)
-    }
-
-    /// Decode packet from raw buffer without the length header.
-    pub fn decode_data(len: i32, mut buf: &[u8]) -> Result<Self, ()> {
         // Read packet ID, select buf
         let (read, packet_id) = types::read_var_int(buf)?;
         buf = &buf[read..];
