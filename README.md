@@ -1,5 +1,7 @@
 # lazymc
 
+_Note: this is a prototype and currently incomplete._
+
 `lazymc` puts your Minecraft server to rest when idle, and wakes it up when
 players connect.
 
