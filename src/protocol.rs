@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use crate::types;
 
 pub const STATUS_PACKET_ID_STATUS: i32 = 0;
@@ -8,10 +10,22 @@ pub const STATUS_PACKET_ID_PING: i32 = 1;
 #[derive(Debug, Default)]
 pub struct Client {
     /// Current client state.
-    pub state: ClientState,
+    pub state: Mutex<ClientState>,
 }
 
-#[derive(Debug, Copy, Clone)]
+impl Client {
+    /// Get client state.
+    pub fn state(&self) -> ClientState {
+        *self.state.lock().unwrap()
+    }
+
+    /// Set client state.
+    pub fn set_state(&self, state: ClientState) {
+        *self.state.lock().unwrap() = state;
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ClientState {
     /// Initial client state.
     Handshake,
@@ -78,6 +92,11 @@ impl RawPacket {
         let (read, len) = types::read_var_int(buf)?;
         buf = &buf[read..][..len as usize];
 
+        Self::decode_data(len, buf)
+    }
+
+    /// Decode packet from raw buffer without the length header.
+    pub fn decode_data(len: i32, mut buf: &[u8]) -> Result<Self, ()> {
         // Read packet ID, select buf
         let (read, packet_id) = types::read_var_int(buf)?;
         buf = &buf[read..];

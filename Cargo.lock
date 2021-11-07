@@ -247,7 +247,7 @@ checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 [[package]]
 name = "minecraft-protocol"
 version = "0.1.0"
-source = "git+https://github.com/eihwaz/minecraft-protocol?rev=09f95625eff272794590e1ef73b2a1b673f47f50#09f95625eff272794590e1ef73b2a1b673f47f50"
+source = "git+https://github.com/timvisee/minecraft-protocol?rev=c578492#c57849246166add5ad45ef36b3bdebd8b744883d"
 dependencies = [
  "byteorder",
  "minecraft-protocol-derive",
@@ -260,7 +260,7 @@ dependencies = [
 [[package]]
 name = "minecraft-protocol-derive"
 version = "0.0.0"
-source = "git+https://github.com/eihwaz/minecraft-protocol?rev=09f95625eff272794590e1ef73b2a1b673f47f50#09f95625eff272794590e1ef73b2a1b673f47f50"
+source = "git+https://github.com/timvisee/minecraft-protocol?rev=c578492#c57849246166add5ad45ef36b3bdebd8b744883d"
 dependencies = [
  "proc-macro2",
  "quote",
