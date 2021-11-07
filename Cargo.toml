@@ -1,7 +1,21 @@
 [package]
 name = "lazymc"
 version = "0.1.0"
+authors = ["Tim Visee <3a4fb3964f@sinenomine.email>"]
 license = "GPL-3.0"
+readme = "README.md"
+# homepage = "https://timvisee.com/projects/lazymc"
+repository = "https://gitlab.com/timvisee/lazymc"
+description = "Put your Minecraft server to rest when idle."
+keywords = ["minecraft", "server", "idle", "cli"]
+categories = [
+    "command-line-interface",
+    "games",
+]
+exclude = [
+    "/.github",
+    "/contrib",
+]
 edition = "2021"
 
 [dependencies]
