@@ -4,6 +4,7 @@ pub(crate) mod protocol;
 pub(crate) mod server;
 pub(crate) mod types;
 
+use std::error::Error;
 use std::sync::Arc;
 
 use bytes::BytesMut;
@@ -56,27 +57,22 @@ async fn main() -> Result<(), ()> {
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
         let client = Client::default();
-        // eprintln!("Client connected");
 
         if !server_state.online() {
             // When server is not online, spawn a status server
             let transfer = status_server(client, inbound, server_state.clone()).map(|r| {
-                if let Err(e) = r {
-                    println!("Failed to proxy: {:?}", e);
+                if let Err(err) = r {
+                    println!("Failed to serve status: {:?}", err);
                 }
-
-                // eprintln!("Client disconnected");
             });
 
             tokio::spawn(transfer);
         } else {
             // When server is online, proxy all
             let transfer = proxy(inbound, ADDRESS_PROXY.to_string()).map(|r| {
-                if let Err(e) = r {
-                    println!("Failed to proxy: {:?}", e);
+                if let Err(err) = r {
+                    println!("Failed to proxy: {:?}", err);
                 }
-
-                // eprintln!("Client disconnected");
             });
 
             tokio::spawn(transfer);
@@ -265,22 +261,22 @@ async fn status_server(
 
 /// Proxy the inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
-async fn proxy(mut inbound: TcpStream, addr_target: String) -> Result<(), ()> {
-    let mut outbound = TcpStream::connect(addr_target).await.map_err(|_| ())?;
-
+async fn proxy(mut inbound: TcpStream, addr_target: String) -> Result<(), Box<dyn Error>> {
+    // Set up connection to server
     // TODO: on connect fail, ping server and redirect to status_server if offline
+    let mut outbound = TcpStream::connect(addr_target).await?;
 
     let (mut ri, mut wi) = inbound.split();
     let (mut ro, mut wo) = outbound.split();
 
     let client_to_server = async {
-        io::copy(&mut ri, &mut wo).await.map_err(|_| ())?;
-        wo.shutdown().await.map_err(|_| ())
+        io::copy(&mut ri, &mut wo).await?;
+        wo.shutdown().await
     };
 
     let server_to_client = async {
-        io::copy(&mut ro, &mut wi).await.map_err(|_| ())?;
-        wi.shutdown().await.map_err(|_| ())
+        io::copy(&mut ro, &mut wi).await?;
+        wi.shutdown().await
     };
 
     tokio::try_join!(client_to_server, server_to_client)?;
