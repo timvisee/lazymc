@@ -95,7 +95,15 @@ pub async fn read_packet<'a>(
     while buf.len() < 2 {
         // Read packet from socket
         let mut tmp = Vec::with_capacity(64);
-        stream.read_buf(&mut tmp).await.map_err(|_| ())?;
+        match stream.read_buf(&mut tmp).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
+            Err(err) => {
+                dbg!(err);
+                return Err(());
+            }
+        }
+
         if tmp.is_empty() {
             return Ok(None);
         }
@@ -116,7 +124,15 @@ pub async fn read_packet<'a>(
     while buf.len() < consumed + len as usize {
         // Read packet from socket
         let mut tmp = Vec::with_capacity(64);
-        stream.read_buf(&mut tmp).await.map_err(|_| ())?;
+        match stream.read_buf(&mut tmp).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
+            Err(err) => {
+                dbg!(err);
+                return Err(());
+            }
+        }
+
         if tmp.is_empty() {
             return Ok(None);
         }
@@ -147,10 +163,7 @@ async fn status_server(
         // Read packet from stream
         let (packet, raw) = match read_packet(&mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
-            Ok(None) => {
-                eprintln!("Closing connection, could not read more");
-                break;
-            }
+            Ok(None) => break,
             Err(_) => {
                 eprintln!("Closing connection, error occurred");
                 break;
@@ -241,7 +254,11 @@ async fn status_server(
     }
 
     // Gracefully close connection
-    writer.shutdown().await.map_err(|_| ())?;
+    match writer.shutdown().await {
+        Ok(_) => {}
+        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
+        Err(_) => return Err(()),
+    }
 
     Ok(())
 }
