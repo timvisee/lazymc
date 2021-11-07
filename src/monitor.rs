@@ -13,7 +13,7 @@ use rand::Rng;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
-use crate::protocol::{self, ClientState, RawPacket};
+use crate::proto::{self, ClientState, RawPacket};
 use crate::server::ServerState;
 
 /// Minecraft protocol version used when polling server status.
@@ -72,7 +72,7 @@ async fn send_handshake(stream: &mut TcpStream, addr: SocketAddr) -> Result<(), 
     let mut packet = Vec::new();
     handshake.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(protocol::HANDSHAKE_PACKET_ID_HANDSHAKE, packet)
+    let raw = RawPacket::new(proto::HANDSHAKE_PACKET_ID_HANDSHAKE, packet)
         .encode()
         .map_err(|_| ())?;
 
@@ -93,7 +93,7 @@ async fn send_ping(stream: &mut TcpStream) -> Result<u64, ()> {
     let mut packet = Vec::new();
     ping.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(protocol::STATUS_PACKET_ID_PING, packet)
+    let raw = RawPacket::new(proto::STATUS_PACKET_ID_PING, packet)
         .encode()
         .map_err(|_| ())?;
 
@@ -110,14 +110,14 @@ async fn wait_for_ping(stream: &mut TcpStream, token: u64) -> Result<(), ()> {
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match crate::read_packet(&mut buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(&mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => continue,
         };
 
         // Catch ping response
-        if packet.id == protocol::STATUS_PACKET_ID_PING {
+        if packet.id == proto::STATUS_PACKET_ID_PING {
             let ping = PingResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
             // Ensure ping token is correct

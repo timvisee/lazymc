@@ -1,5 +1,10 @@
 use std::sync::Mutex;
 
+use bytes::BytesMut;
+use tokio::io;
+use tokio::io::AsyncReadExt;
+use tokio::net::tcp::ReadHalf;
+
 use crate::types;
 
 pub const HANDSHAKE_PACKET_ID_HANDSHAKE: i32 = 0;
@@ -112,4 +117,64 @@ impl RawPacket {
 
         return Ok(packet);
     }
+}
+
+/// Read raw packet from stream.
+pub async fn read_packet<'a>(
+    buf: &mut BytesMut,
+    stream: &mut ReadHalf<'a>,
+) -> Result<Option<(RawPacket, Vec<u8>)>, ()> {
+    // Keep reading until we have at least 2 bytes
+    while buf.len() < 2 {
+        // Read packet from socket
+        let mut tmp = Vec::with_capacity(64);
+        match stream.read_buf(&mut tmp).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
+            Err(err) => {
+                dbg!(err);
+                return Err(());
+            }
+        }
+
+        if tmp.is_empty() {
+            return Ok(None);
+        }
+        buf.extend(tmp);
+    }
+
+    // Attempt to read packet length
+    let (consumed, len) = match types::read_var_int(&buf) {
+        Ok(result) => result,
+        Err(err) => {
+            error!("Malformed packet, could not read packet length");
+            return Err(err);
+        }
+    };
+
+    // Keep reading until we have all packet bytes
+    while buf.len() < consumed + len as usize {
+        // Read packet from socket
+        let mut tmp = Vec::with_capacity(64);
+        match stream.read_buf(&mut tmp).await {
+            Ok(_) => {}
+            Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
+            Err(err) => {
+                dbg!(err);
+                return Err(());
+            }
+        }
+
+        if tmp.is_empty() {
+            return Ok(None);
+        }
+
+        buf.extend(tmp);
+    }
+
+    // Parse packet
+    let raw = buf.split_to(consumed + len as usize);
+    let packet = RawPacket::decode(&raw)?;
+
+    Ok(Some((packet, raw.to_vec())))
 }
