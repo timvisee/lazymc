@@ -35,7 +35,7 @@ pub async fn poll_server(addr: SocketAddr) -> bool {
 /// Monitor server.
 pub async fn monitor_server(addr: SocketAddr, state: Arc<ServerState>) {
     loop {
-        // TODO: eprintln!("Polling {} ... ", addr);
+        trace!("Polling {} ... ", addr);
         let online = poll_server(addr).await;
 
         state.set_online(online);

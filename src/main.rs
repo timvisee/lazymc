@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 pub(crate) mod config;
 pub(crate) mod monitor;
 pub(crate) mod protocol;
@@ -28,7 +31,11 @@ use server::ServerState;
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
-    println!(
+    // Initialize logging
+    let _ = dotenv::dotenv();
+    pretty_env_logger::init();
+
+    info!(
         "Proxying public {} to internal {}",
         ADDRESS_PUBLIC, ADDRESS_PROXY,
     );
@@ -62,7 +69,7 @@ async fn main() -> Result<(), ()> {
             // When server is not online, spawn a status server
             let transfer = status_server(client, inbound, server_state.clone()).map(|r| {
                 if let Err(err) = r {
-                    println!("Failed to serve status: {:?}", err);
+                    error!("Failed to serve status: {:?}", err);
                 }
             });
 
@@ -71,7 +78,7 @@ async fn main() -> Result<(), ()> {
             // When server is online, proxy all
             let transfer = proxy(inbound, ADDRESS_PROXY.to_string()).map(|r| {
                 if let Err(err) = r {
-                    println!("Failed to proxy: {:?}", err);
+                    error!("Failed to proxy: {:?}", err);
                 }
             });
 
@@ -110,8 +117,8 @@ pub async fn read_packet<'a>(
     let (consumed, len) = match types::read_var_int(&buf) {
         Ok(result) => result,
         Err(err) => {
-            eprintln!("Failed to read packet length, should retry!");
-            eprintln!("{:?}", (&buf).as_ref());
+            error!("Failed to read packet length, should retry!");
+            error!("{:?}", (&buf).as_ref());
             return Err(err);
         }
     };
@@ -161,7 +168,7 @@ async fn status_server(
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
-                eprintln!("Closing connection, error occurred");
+                error!("Closing connection, error occurred");
                 break;
             }
         };
@@ -243,10 +250,10 @@ async fn status_server(
             continue;
         }
 
-        // // Show unhandled packet warning
-        // eprintln!("Received unhandled packet:");
-        // eprintln!("- State: {:?}", client.state());
-        // eprintln!("- Packet ID: {}", packet.id);
+        // Show unhandled packet warning
+        debug!("Received unhandled packet:");
+        debug!("- State: {:?}", client.state());
+        debug!("- Packet ID: {}", packet.id);
     }
 
     // Gracefully close connection

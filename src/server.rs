@@ -42,7 +42,7 @@ impl ServerState {
     /// Kill any running server.
     pub fn kill_server(&self) -> bool {
         if let Some(pid) = *self.pid.lock().unwrap() {
-            eprintln!("[lazymc] Sending kill signal to server");
+            warn!("Sending kill signal to server");
             kill_gracefully(pid);
             return true;
         }
@@ -60,13 +60,13 @@ impl ServerState {
 pub async fn start(state: Arc<ServerState>) -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::new(SERVER_CMD);
 
-    eprintln!("[lazymc] Starting server...");
+    info!("Starting server...");
     let mut child = cmd.spawn()?;
 
     state.set_pid(Some(child.id().expect("unknown server PID")));
 
     let status = child.wait().await?;
-    eprintln!("[lazymc] Server stopped (status: {})\n", status);
+    info!("Server stopped (status: {})\n", status);
 
     // Reset online and starting state
     // TODO: also set this when returning early due to error
