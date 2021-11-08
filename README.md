@@ -15,10 +15,10 @@ proxies the rest.
 
 ## Screenshots
 
-![Sleeping server](./res/screenshot-sleeping.png)
-![Join sleeping server](./res/screenshot-join.png)
-![Starting server](./res/screenshot-starting.png)
-![Started server](./res/screenshot-started.png)
+![Sleeping server](./res/screenshot/sleeping.png)
+![Join sleeping server](./res/screenshot/join.png)
+![Starting server](./res/screenshot/starting.png)
+![Started server](./res/screenshot/started.png)
 
 ## License
 This project is released under the GNU GPL-3.0 license.
