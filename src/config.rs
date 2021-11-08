@@ -100,8 +100,8 @@ pub struct Server {
     #[serde(alias = "address_ingress")]
     pub address: SocketAddr,
 
-    /// Immediately start sleeping when starting lazymc.
-    pub sleep_on_start: bool,
+    /// Immediately wake server when starting lazymc.
+    pub wake_on_start: bool,
 }
 
 /// Time configuration.

@@ -19,8 +19,8 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Internal IP and port of server started by lazymc to proxy to.
 address = "127.0.0.1:25566"
 
-# Start sleeping when starting lazymc.
-sleep_on_start = true
+# Immediately wake server when starting lazymc.
+wake_on_start = false
 
 [time]
 # Sleep after number of seconds.
