@@ -2,7 +2,7 @@
 pub fn read_var_int(buf: &[u8]) -> Result<(usize, i32), ()> {
     for len in 1..=5.min(buf.len()) {
         // Find var-int byte size
-        let extra_byte = (buf[len - 1] & (1 >> 7)) > 0;
+        let extra_byte = (buf[len - 1] & (1 << 7)) > 0;
         if extra_byte {
             continue;
         }
