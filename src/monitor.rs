@@ -25,13 +25,15 @@ const STATUS_TIMEOUT: u64 = 8;
 /// Monitor server.
 pub async fn monitor_server(addr: SocketAddr, state: Arc<ServerState>) {
     loop {
+        // Poll server state and update internal status
         trace!("Fetching status for {} ... ", addr);
         let status = poll_server(addr).await;
+        state.update_status(status);
 
-        // Update server state
-        state.set_online(status.is_some());
-        if let Some(status) = status {
-            state.set_status(status);
+        // Sleep server when it's bedtime
+        if state.should_sleep() {
+            info!("Server has been idle, initiating sleep...");
+            state.kill_server();
         }
 
         // TODO: use interval instead, for a more reliable polling interval?

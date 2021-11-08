@@ -133,8 +133,10 @@ async fn serve_status(
             writer.write_all(&response).await.map_err(|_| ())?;
 
             // Start server if not starting yet
+            // TODO: move this into server state?
             if !server.starting() {
                 server.set_starting(true);
+                server.update_last_active_time();
                 tokio::spawn(server::start(server).map(|_| ()));
             }
 

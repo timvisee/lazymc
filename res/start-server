@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Server file
+FILE=server.jar
+
+# Switch to script directory
+DIR="$(dirname "$(realpath "$0")")"
+cd $DIR
+
+# Catch SIGTERM to gracefully stop server
+trap 'kill -TERM $PID' TERM INT
+
+# Start server
+java -Xms1G -Xmx1G -jar $FILE --nogui &
+
+# Clean up stopped server
+PID=$!
+wait $PID
+trap - TERM INT
+wait $PID
