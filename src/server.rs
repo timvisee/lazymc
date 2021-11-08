@@ -205,7 +205,9 @@ pub async fn invoke_server_command(
     // Build command
     let mut cmd = Command::new(args[0]);
     cmd.args(args.iter().skip(1));
-    cmd.current_dir(&config.server.directory);
+    if let Some(ref dir) = config.server.directory {
+        cmd.current_dir(dir);
+    }
     cmd.kill_on_drop(true);
 
     info!(target: "lazymc", "Starting server...");

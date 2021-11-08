@@ -91,7 +91,7 @@ pub struct Public {
 #[derive(Debug, Deserialize)]
 pub struct Server {
     /// Server directory.
-    pub directory: PathBuf,
+    pub directory: Option<PathBuf>,
 
     /// Start command.
     pub command: String,
