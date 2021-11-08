@@ -3,10 +3,56 @@ use std::io;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
+use clap::ArgMatches;
 use serde::Deserialize;
+
+use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
 
 /// Default configuration file location.
 pub const CONFIG_FILE: &str = "lazymc.toml";
+
+/// Load config from file, based on CLI arguments.
+///
+/// Quits with an error message on failure.
+pub fn load(matches: &ArgMatches) -> Config {
+    // Get config path, attempt to canonicalize
+    let mut path = PathBuf::from(matches.value_of("config").unwrap());
+    if let Ok(p) = path.canonicalize() {
+        path = p;
+    }
+
+    // Ensure configuration file exists
+    if !path.is_file() {
+        quit_error_msg(
+            format!(
+                "Conig file does not exist: {}",
+                path.to_str().unwrap_or("?")
+            ),
+            ErrorHintsBuilder::default()
+                .config(true)
+                .config_generate(true)
+                .build()
+                .unwrap(),
+        );
+    }
+
+    // Load config
+    let config = match Config::load(path) {
+        Ok(config) => config,
+        Err(err) => {
+            quit_error(
+                anyhow!(err).context("Failed to load config"),
+                ErrorHintsBuilder::default()
+                    .config(true)
+                    .config_test(true)
+                    .build()
+                    .unwrap(),
+            );
+        }
+    };
+
+    config
+}
 
 /// Configuration.
 #[derive(Debug, Deserialize)]
@@ -25,7 +71,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration form file.
+    /// Load configuration from file.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, io::Error> {
         let data = fs::read(path)?;
         let config = toml::from_slice(&data)?;
