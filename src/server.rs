@@ -162,6 +162,18 @@ impl ServerState {
             return false;
         }
 
+        // Never idle if players are online
+        let players_online = self
+            .status
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|status| status.players.online > 0)
+            .unwrap_or(false);
+        if players_online {
+            return false;
+        }
+
         // Last active time must have passed sleep threshold
         if let Some(last_idle) = self.last_active.lock().unwrap().as_ref() {
             return last_idle.elapsed() >= Duration::from_secs(config.time.sleep_after as u64);
