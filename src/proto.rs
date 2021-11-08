@@ -169,7 +169,7 @@ pub async fn read_packet<'a>(
     let (consumed, len) = match types::read_var_int(&buf) {
         Ok(result) => result,
         Err(err) => {
-            error!("Malformed packet, could not read packet length");
+            error!(target: "lazymc", "Malformed packet, could not read packet length");
             return Err(err);
         }
     };

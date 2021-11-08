@@ -38,7 +38,7 @@ pub async fn serve(
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
-                error!("Closing connection, error occurred");
+                error!(target: "lazymc", "Closing connection, error occurred");
                 break;
             }
         };
@@ -129,9 +129,9 @@ pub async fn serve(
         }
 
         // Show unhandled packet warning
-        debug!("Received unhandled packet:");
-        debug!("- State: {:?}", client.state());
-        debug!("- Packet ID: {}", packet.id);
+        debug!(target: "lazymc", "Received unhandled packet:");
+        debug!(target: "lazymc", "- State: {:?}", client.state());
+        debug!(target: "lazymc", "- Packet ID: {}", packet.id);
     }
 
     // Gracefully close connection

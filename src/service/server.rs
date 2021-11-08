@@ -28,7 +28,8 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         })?;
 
     info!(
-        "Proxying egress {} to ingress {}",
+        target: "lazymc",
+        "Proxying public {} to server {}",
         config.public.address, config.server.address,
     );
 
@@ -48,7 +49,7 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
             let transfer = status::serve(client, inbound, config.clone(), server_state.clone())
                 .map(|r| {
                     if let Err(err) = r {
-                        warn!("Failed to serve status: {:?}", err);
+                        warn!(target: "lazymc", "Failed to serve status: {:?}", err);
                     }
                 });
 
@@ -57,7 +58,7 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
             // When server is online, proxy all
             let transfer = proxy::proxy(inbound, config.server.address).map(|r| {
                 if let Err(err) = r {
-                    warn!("Failed to proxy: {}", err);
+                    warn!(target: "lazymc", "Failed to proxy: {}", err);
                 }
             });
 

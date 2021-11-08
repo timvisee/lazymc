@@ -19,19 +19,29 @@ pub(crate) mod status;
 pub(crate) mod types;
 pub(crate) mod util;
 
+use std::env;
+
 use clap::App;
 
 /// Main entrypoint.
 #[tokio::main]
 async fn main() -> Result<(), ()> {
-    // Initialize logging
-    // TODO: set default levels!
-    let _ = dotenv::dotenv();
-    pretty_env_logger::init();
+    // Initialize logger
+    init_log();
 
     // Build clap app, invoke intended action
     let app = cli::app();
     invoke_action(app).await
+}
+
+/// Initialize logger.
+fn init_log() {
+    // Set default log level, load from .env
+    env::set_var("RUST_LOG", "info");
+    let _ = dotenv::dotenv();
+
+    // Initialize logger
+    pretty_env_logger::init();
 }
 
 /// Invoke an action.

@@ -30,13 +30,13 @@ pub async fn monitor_server(config: Arc<Config>, state: Arc<ServerState>) {
 
     loop {
         // Poll server state and update internal status
-        trace!("Fetching status for {} ... ", addr);
+        trace!(target: "lazymc::monitor", "Fetching status for {} ... ", addr);
         let status = poll_server(addr).await;
         state.update_status(status);
 
         // Sleep server when it's bedtime
         if state.should_sleep(&config) {
-            info!("Server has been idle, sleeping...");
+            info!(target: "lazymc::montior", "Server has been idle, sleeping...");
             state.kill_server();
         }
 

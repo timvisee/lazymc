@@ -59,7 +59,7 @@ impl ServerState {
     /// Kill any running server.
     pub fn kill_server(&self) -> bool {
         if let Some(pid) = *self.pid.lock().unwrap() {
-            debug!("Sending kill signal to server");
+            debug!(target: "lazymc", "Sending kill signal to server");
             kill_gracefully(pid);
 
             // TODO: should we set this?
@@ -100,7 +100,7 @@ impl ServerState {
         // If server just came online, update last active time
         if !was_online && online {
             // TODO: move this somewhere else
-            info!("Server is now online");
+            info!(target: "lazymc::monitor", "Server is now online");
             self.update_last_active_time();
         }
 
@@ -164,13 +164,13 @@ pub async fn start(
     cmd.current_dir(&config.server.directory);
     cmd.kill_on_drop(true);
 
-    info!("Starting server...");
+    info!(target: "lazymc", "Starting server...");
     let mut child = cmd.spawn()?;
 
     state.set_pid(Some(child.id().expect("unknown server PID")));
 
     let status = child.wait().await?;
-    info!("Server stopped (status: {})\n", status);
+    info!(target: "lazymc", "Server stopped (status: {})\n", status);
 
     // Reset online and starting state
     // TODO: also set this when returning early due to error
@@ -186,9 +186,9 @@ pub async fn start(
 fn kill_gracefully(pid: u32) {
     #[cfg(unix)]
     unsafe {
-        debug!("Sending SIGTERM signal to {} to kill server", pid);
+        debug!(target: "lazymc", "Sending SIGTERM signal to {} to kill server", pid);
         let result = libc::kill(pid as i32, libc::SIGTERM);
-        trace!("SIGTERM result: {}", result);
+        trace!(target: "lazymc", "SIGTERM result: {}", result);
 
         // TODO: send sigterm to childs as well?
         // TODO: handle error if != 0
