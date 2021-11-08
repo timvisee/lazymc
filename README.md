@@ -15,7 +15,7 @@ proxies the rest.
 
 ## Demo
 
-![Demo video](https://user-images.githubusercontent.com/856222/140804726-ba1a8e59-85d9-413b-8229-03be84b55d51.mp4)
+https://user-images.githubusercontent.com/856222/140804726-ba1a8e59-85d9-413b-8229-03be84b55d51.mp4
 
 <details><summary>Click to see screenshots</summary>
 <p>
