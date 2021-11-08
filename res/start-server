@@ -1,19 +1,15 @@
 #!/bin/bash
 
-# Server file
+# Server JAR file, set this to your own
 FILE=server.jar
 
-# Switch to script directory
-DIR="$(dirname "$(realpath "$0")")"
-cd $DIR
-
-# Catch SIGTERM to gracefully stop server
+# Trap SIGTERM, forward it to server process ID
 trap 'kill -TERM $PID' TERM INT
 
 # Start server
 java -Xms1G -Xmx1G -jar $FILE --nogui &
 
-# Clean up stopped server
+# Remember server process ID, wait for it to quit, then reset the trap
 PID=$!
 wait $PID
 trap - TERM INT

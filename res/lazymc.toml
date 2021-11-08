@@ -12,6 +12,8 @@ address = "0.0.0.0:25565"
 directory = "."
 
 # Command to start the server.
+#
+# Warning: if using a bash script, see: https://github.com/timvisee/lazymc/blob/master/docs/command_bash.md
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
 # Ingress address.
@@ -40,5 +42,5 @@ motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
 login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
 
 [advanced]
-# Automatically set internal IP and port in Minecraft server.properties file.
+# Automatically set IP and port in Minecraft server.properties file.
 rewrite_server_properties = true
