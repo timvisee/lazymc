@@ -38,3 +38,7 @@ motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
 
 # Login (kick) message when server is starting.
 login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
+
+[advanced]
+# Automatically set internal IP and port in Minecraft server.properties file.
+rewrite_server_properties = true

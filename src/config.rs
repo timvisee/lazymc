@@ -68,6 +68,9 @@ pub struct Config {
 
     /// Messages, shown to the user.
     pub messages: Messages,
+
+    /// Advanced configuration.
+    pub advanced: Advanced,
 }
 
 impl Config {
@@ -101,6 +104,7 @@ pub struct Server {
     pub address: SocketAddr,
 
     /// Immediately wake server when starting lazymc.
+    #[serde(default)]
     pub wake_on_start: bool,
 }
 
@@ -111,12 +115,11 @@ pub struct Time {
     pub sleep_after: u32,
 
     /// Minimum time in seconds to stay online when server is started.
-    // TODO: implement this
     #[serde(default, alias = "minimum_online_time")]
     pub min_online_time: u32,
 }
 
-/// Messages.
+/// Message configuration.
 #[derive(Debug, Deserialize)]
 pub struct Messages {
     /// MOTD when server is sleeping.
@@ -127,4 +130,11 @@ pub struct Messages {
 
     /// Login message when server is starting.
     pub login_starting: String,
+}
+
+/// Advanced configuration.
+#[derive(Debug, Deserialize)]
+pub struct Advanced {
+    /// Rewrite server.properties.
+    pub rewrite_server_properties: bool,
 }

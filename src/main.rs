@@ -10,6 +10,7 @@ extern crate log;
 pub(crate) mod action;
 pub(crate) mod cli;
 pub(crate) mod config;
+pub(crate) mod mc;
 pub(crate) mod monitor;
 pub(crate) mod proto;
 pub(crate) mod proxy;
