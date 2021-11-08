@@ -112,7 +112,7 @@ pub struct Time {
 
     /// Minimum time in seconds to stay online when server is started.
     // TODO: implement this
-    #[serde(alias = "minimum_online_time")]
+    #[serde(default, alias = "minimum_online_time")]
     pub min_online_time: u32,
 }
 

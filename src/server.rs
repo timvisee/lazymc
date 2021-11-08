@@ -34,6 +34,9 @@ pub struct ServerState {
     ///
     /// The last known time when the server was active with online players.
     last_active: Mutex<Option<Instant>>,
+
+    /// Keep server online until.
+    keep_online_until: Mutex<Option<Instant>>,
 }
 
 impl ServerState {
@@ -65,6 +68,7 @@ impl ServerState {
 
             // TODO: should we set this?
             self.set_online(false);
+            self.set_keep_online_until(None);
 
             return true;
         }
@@ -90,9 +94,21 @@ impl ServerState {
         self.status.lock().unwrap().replace(status);
     }
 
+    /// Update the last active time.
+    pub fn update_last_active_time(&self) {
+        self.last_active.lock().unwrap().replace(Instant::now());
+    }
+
+    /// Update the last active time.
+    pub fn set_keep_online_until(&self, duration: Option<u32>) {
+        *self.keep_online_until.lock().unwrap() = duration
+            .filter(|d| *d > 0)
+            .map(|d| Instant::now() + Duration::from_secs(d as u64));
+    }
+
     /// Update the server status, online state and last active time.
     // TODO: clean this up
-    pub fn update_status(&self, status: Option<ServerStatus>) {
+    pub fn update_status(&self, config: &Config, status: Option<ServerStatus>) {
         let stopping = self.stopping.load(Ordering::Relaxed);
         let was_online = self.online();
         let online = status.is_some() && !stopping;
@@ -103,6 +119,7 @@ impl ServerState {
             // TODO: move this somewhere else
             info!(target: "lazymc::monitor", "Server is now online");
             self.update_last_active_time();
+            self.set_keep_online_until(Some(config.time.min_online_time));
         }
 
         // // If server just went offline, reset stopping state
@@ -122,16 +139,23 @@ impl ServerState {
         }
     }
 
-    /// Update the last active time.
-    pub fn update_last_active_time(&self) {
-        self.last_active.lock().unwrap().replace(Instant::now());
-    }
-
     /// Check whether the server should now sleep.
     pub fn should_sleep(&self, config: &Config) -> bool {
         // TODO: when initating server start, set last active time!
         // TODO: do not initiate sleep when starting?
         // TODO: do not initiate sleep when already initiated (with timeout)
+
+        // Don't sleep when keep online until isn't expired
+        let keep_online = self
+            .keep_online_until
+            .lock()
+            .unwrap()
+            .map(|i| i >= Instant::now())
+            .unwrap_or(false);
+        if keep_online {
+            info!("Not sleeping because of keep online");
+            return false;
+        }
 
         // Server must be online, and must not be starting
         if !self.online() || !self.starting() {
