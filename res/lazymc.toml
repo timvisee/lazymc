@@ -1,0 +1,37 @@
+# lazymc configuration
+
+[public]
+# Egress address.
+#
+# Public IP and port users will connect to.
+# Shows sleeping status, starts server on connect, and proxies to ingress server.
+address_egress = "0.0.0.0:25565"
+
+[server]
+# Server directory.
+directory = "."
+
+# Command to start the server.
+command = "java -Xms1G -Xmx1G -jar server.jar --nogui"
+
+# Ingress address.
+#
+# Internal IP and port of server started by lazymc to proxy to.
+address_ingress = "127.0.0.1:25566"
+
+[time]
+# Sleep after number of seconds.
+sleep_after = 60
+
+# Minimum time in seconds to stay online when server is started.
+minimum_online_time = 60
+
+[messages]
+# MOTD when server is sleeping.
+motd_sleeping = "☠ Server is sleeping\n§2☻ Join to start it up"
+
+# MOTD when server is starting.
+motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
+
+# Login (kick) message when server is starting.
+login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
