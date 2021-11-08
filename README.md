@@ -13,12 +13,20 @@ server when idle, until a player connects again.
 incoming status connections until the server is started and then transparently
 proxies the rest.
 
-## Screenshots
+## Demo
+
+![Demo video](./res/screenshot/demo.mp4)
+
+<details><summary>Click to see screenshots</summary>
+<p>
 
 ![Sleeping server](./res/screenshot/sleeping.png)
 ![Join sleeping server](./res/screenshot/join.png)
 ![Starting server](./res/screenshot/starting.png)
 ![Started server](./res/screenshot/started.png)
+
+</p>
+</details>
 
 ## License
 This project is released under the GNU GPL-3.0 license.
