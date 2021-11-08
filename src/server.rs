@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
 
-use crate::config::{SERVER_CMD, SLEEP_DELAY};
+use crate::config::Config;
 
 /// Shared server state.
 #[derive(Default, Debug)]
@@ -127,7 +127,7 @@ impl ServerState {
     }
 
     /// Check whether the server should now sleep.
-    pub fn should_sleep(&self) -> bool {
+    pub fn should_sleep(&self, config: &Config) -> bool {
         // TODO: when initating server start, set last active time!
         // TODO: do not initiate sleep when starting?
         // TODO: do not initiate sleep when already initiated (with timeout)
@@ -139,7 +139,7 @@ impl ServerState {
 
         // Last active time must have passed sleep threshold
         if let Some(last_idle) = self.last_active.lock().unwrap().as_ref() {
-            return last_idle.elapsed() >= Duration::from_secs(SLEEP_DELAY);
+            return last_idle.elapsed() >= Duration::from_secs(config.time.sleep_after as u64);
         }
 
         false
@@ -147,8 +147,22 @@ impl ServerState {
 }
 
 /// Start Minecraft server.
-pub async fn start(state: Arc<ServerState>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::new(SERVER_CMD);
+pub async fn start(
+    config: Arc<Config>,
+    state: Arc<ServerState>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: this doesn't properly handle quotes
+    let args = config
+        .server
+        .command
+        .split_terminator(" ")
+        .collect::<Vec<_>>();
+
+    // Build command
+    let mut cmd = Command::new(args[0]);
+    cmd.args(args.iter().skip(1));
+    cmd.current_dir(&config.server.directory);
+    cmd.kill_on_drop(true);
 
     info!("Starting server...");
     let mut child = cmd.spawn()?;

@@ -13,6 +13,7 @@ use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
+use crate::config::Config;
 use crate::proto::{self, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL};
 use crate::server::ServerState;
 
@@ -23,7 +24,10 @@ const MONITOR_PING_INTERVAL: u64 = 2;
 const STATUS_TIMEOUT: u64 = 8;
 
 /// Monitor server.
-pub async fn monitor_server(addr: SocketAddr, state: Arc<ServerState>) {
+pub async fn monitor_server(config: Arc<Config>, state: Arc<ServerState>) {
+    // Server address
+    let addr = config.server.address;
+
     loop {
         // Poll server state and update internal status
         trace!("Fetching status for {} ... ", addr);
@@ -31,8 +35,8 @@ pub async fn monitor_server(addr: SocketAddr, state: Arc<ServerState>) {
         state.update_status(status);
 
         // Sleep server when it's bedtime
-        if state.should_sleep() {
-            info!("Server has been idle, initiating sleep...");
+        if state.should_sleep(&config) {
+            info!("Server has been idle, sleeping...");
             state.kill_server();
         }
 

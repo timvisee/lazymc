@@ -8,6 +8,7 @@ pub(crate) mod server;
 pub(crate) mod types;
 
 use std::error::Error;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::BytesMut;
@@ -30,25 +31,38 @@ use server::ServerState;
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     // Initialize logging
+    // TODO: set default levels!
     let _ = dotenv::dotenv();
     pretty_env_logger::init();
+
+    // Load config
+    let config = match Config::load() {
+        Ok(config) => Arc::new(config),
+        Err(err) => {
+            error!("Failed to load configuration:");
+            error!("{}", err);
+            return Err(());
+        }
+    };
 
     let server_state = Arc::new(ServerState::default());
 
     // Listen for new connections
     // TODO: do not drop error here
-    let listener = TcpListener::bind(ADDRESS_PUBLIC).await.map_err(|err| {
-        error!("Failed to start: {}", err);
-        ()
-    })?;
+    let listener = TcpListener::bind(config.public.address)
+        .await
+        .map_err(|err| {
+            error!("Failed to start: {}", err);
+            ()
+        })?;
 
     info!(
         "Proxying egress {} to ingress {}",
-        ADDRESS_PUBLIC, ADDRESS_PROXY,
+        config.public.address, config.server.address,
     );
 
     // Spawn server monitor and signal handler
-    tokio::spawn(server_monitor(server_state.clone()));
+    tokio::spawn(server_monitor(config.clone(), server_state.clone()));
     tokio::spawn(signal_handler(server_state.clone()));
 
     // Proxy all incomming connections
@@ -57,18 +71,19 @@ async fn main() -> Result<(), ()> {
 
         if !server_state.online() {
             // When server is not online, spawn a status server
-            let transfer = serve_status(client, inbound, server_state.clone()).map(|r| {
-                if let Err(err) = r {
-                    error!("Failed to serve status: {:?}", err);
-                }
-            });
+            let transfer =
+                serve_status(client, inbound, config.clone(), server_state.clone()).map(|r| {
+                    if let Err(err) = r {
+                        warn!("Failed to serve status: {:?}", err);
+                    }
+                });
 
             tokio::spawn(transfer);
         } else {
             // When server is online, proxy all
-            let transfer = proxy(inbound, ADDRESS_PROXY.to_string()).map(|r| {
+            let transfer = proxy(inbound, config.server.address).map(|r| {
                 if let Err(err) = r {
-                    error!("Failed to proxy: {}", err);
+                    warn!("Failed to proxy: {}", err);
                 }
             });
 
@@ -91,9 +106,8 @@ pub async fn signal_handler(server_state: Arc<ServerState>) {
 }
 
 /// Server monitor task.
-pub async fn server_monitor(state: Arc<ServerState>) {
-    let addr = ADDRESS_PROXY.parse().expect("invalid server IP");
-    monitor::monitor_server(addr, state).await
+pub async fn server_monitor(config: Arc<Config>, state: Arc<ServerState>) {
+    monitor::monitor_server(config, state).await
 }
 
 /// Proxy the given inbound stream to a target address.
@@ -101,6 +115,7 @@ pub async fn server_monitor(state: Arc<ServerState>) {
 async fn serve_status(
     client: Client,
     mut inbound: TcpStream,
+    config: Arc<Config>,
     server: Arc<ServerState>,
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
@@ -122,7 +137,7 @@ async fn serve_status(
         // Hijack login start
         if client.state() == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
             let packet = LoginDisconnect {
-                reason: Message::new(Payload::text(LABEL_SERVER_STARTING_MESSAGE)),
+                reason: Message::new(Payload::text(&config.messages.login_starting)),
             };
 
             let mut data = Vec::new();
@@ -137,7 +152,7 @@ async fn serve_status(
             if !server.starting() {
                 server.set_starting(true);
                 server.update_last_active_time();
-                tokio::spawn(server::start(server).map(|_| ()));
+                tokio::spawn(server::start(config, server).map(|_| ()));
             }
 
             break;
@@ -173,9 +188,9 @@ async fn serve_status(
 
             // Select description
             let description = if server.starting() {
-                LABEL_SERVER_STARTING
+                &config.messages.motd_starting
             } else {
-                LABEL_SERVER_SLEEPING
+                &config.messages.motd_sleeping
             };
 
             // Build status resposne
@@ -221,7 +236,7 @@ async fn serve_status(
 }
 
 /// Proxy the inbound stream to a target address.
-async fn proxy(mut inbound: TcpStream, addr_target: String) -> Result<(), Box<dyn Error>> {
+async fn proxy(mut inbound: TcpStream, addr_target: SocketAddr) -> Result<(), Box<dyn Error>> {
     // Set up connection to server
     // TODO: on connect fail, ping server and redirect to serve_status if offline
     let mut outbound = TcpStream::connect(addr_target).await?;

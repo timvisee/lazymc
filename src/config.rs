@@ -1,21 +1,81 @@
-/// Command to start server.
-pub const SERVER_CMD: &str = "/home/timvisee/git/lazymc/mcserver/start";
+use std::fs;
+use std::io;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
-/// Public address for users to connect to.
-pub const ADDRESS_PUBLIC: &str = "127.0.0.1:9090";
+use serde::Deserialize;
 
-/// Minecraft server address to proxy to.
-pub const ADDRESS_PROXY: &str = "127.0.0.1:9091";
+/// Default configuration file location.
+const CONFIG_FILE: &str = "lazymc.toml";
 
-/// Server description shown when server is starting.
-pub const LABEL_SERVER_SLEEPING: &str = "☠ Server is sleeping\n§2☻ Join to start it up";
+/// Configuration.
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    /// Public configuration.
+    pub public: Public,
 
-/// Server description shown when server is starting.
-pub const LABEL_SERVER_STARTING: &str = "§2☻ Server is starting...\n§7⌛ Please wait...";
+    /// Server configuration.
+    pub server: Server,
 
-/// Kick message shown when user tries to connect to starting server.
-pub const LABEL_SERVER_STARTING_MESSAGE: &str =
-    "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.";
+    /// Time configuration.
+    pub time: Time,
 
-/// Idle server sleeping delay in seconds.
-pub const SLEEP_DELAY: u64 = 10;
+    /// Messages, shown to the user.
+    pub messages: Messages,
+}
+
+impl Config {
+    /// Load configuration form file.
+    pub fn load() -> Result<Self, io::Error> {
+        let data = fs::read(CONFIG_FILE)?;
+        let config = toml::from_slice(&data)?;
+        Ok(config)
+    }
+}
+
+/// Public configuration.
+#[derive(Debug, Deserialize)]
+pub struct Public {
+    /// Egress address.
+    #[serde(alias = "address_egress")]
+    pub address: SocketAddr,
+}
+
+/// Server configuration.
+#[derive(Debug, Deserialize)]
+pub struct Server {
+    /// Server directory.
+    pub directory: PathBuf,
+
+    /// Start command.
+    pub command: String,
+
+    /// Ingress address.
+    #[serde(alias = "address_ingress")]
+    pub address: SocketAddr,
+}
+
+/// Time configuration.
+#[derive(Debug, Deserialize)]
+pub struct Time {
+    /// Sleep after number of seconds.
+    pub sleep_after: u32,
+
+    /// Minimum time in seconds to stay online when server is started.
+    // TODO: implement this
+    #[serde(alias = "minimum_online_time")]
+    pub min_online_time: u32,
+}
+
+/// Messages.
+#[derive(Debug, Deserialize)]
+pub struct Messages {
+    /// MOTD when server is sleeping.
+    pub motd_sleeping: String,
+
+    /// MOTD when server is starting.
+    pub motd_starting: String,
+
+    /// Login message when server is starting.
+    pub login_starting: String,
+}
