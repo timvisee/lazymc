@@ -1,12 +1,12 @@
 # Use bash script to start server
 
-You may use a `bash` script to start your server, rather than invoking `java`
-directly. This requires some changes though, to ensure your server properly
-shuts down.
+You may use a `bash` script to start your server rather than invoking `java`
+directly. This requires some changes though to ensure your server properly shuts
+down.
 
-When `lazymc` wants to stop your server, it sends a [`SIGTERM`][sigterm] signal
-to the server command to gracefully shut it down. `bash` ignores this signal by
-default and keeps the server running.
+When `lazymc` stops your server it sends a [`SIGTERM`][sigterm] signal to the
+invoked server process to gracefully shut it down. `bash` ignores this signal by
+default and keeps the Minecraft server running.
 
 You must configure `bash` to [forward][forward-signal] the signal to properly
 shutdown the Minecraft server as well.

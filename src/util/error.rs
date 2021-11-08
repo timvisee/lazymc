@@ -127,16 +127,16 @@ impl ErrorHints {
 
         // Print hints
         let bin = crate::util::bin_name();
-        if self.config {
-            eprintln!(
-                "Use '{}' to select a config file",
-                highlight("--config FILE")
-            );
-        }
         if self.config_generate {
             eprintln!(
                 "Use '{}' to generate a new config file",
                 highlight(&format!("{} config generate", bin))
+            );
+        }
+        if self.config {
+            eprintln!(
+                "Use '{}' to select a config file",
+                highlight("--config FILE")
             );
         }
         if self.config_test {

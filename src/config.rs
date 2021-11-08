@@ -25,7 +25,7 @@ pub fn load(matches: &ArgMatches) -> Config {
     if !path.is_file() {
         quit_error_msg(
             format!(
-                "Conig file does not exist: {}",
+                "Config file does not exist: {}",
                 path.to_str().unwrap_or("?")
             ),
             ErrorHintsBuilder::default()

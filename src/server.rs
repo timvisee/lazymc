@@ -153,7 +153,7 @@ impl ServerState {
             .map(|i| i >= Instant::now())
             .unwrap_or(false);
         if keep_online {
-            info!("Not sleeping because of keep online");
+            trace!(target: "lazymc", "Not sleeping because of keep online");
             return false;
         }
 
