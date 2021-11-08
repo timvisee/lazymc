@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use bytes::BytesMut;
-use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
@@ -57,12 +56,7 @@ pub async fn serve(
             writer.write_all(&response).await.map_err(|_| ())?;
 
             // Start server if not starting yet
-            // TODO: move this into server state?
-            if !server.starting() {
-                server.set_starting(true);
-                server.update_last_active_time();
-                tokio::spawn(server::start(config, server).map(|_| ()));
-            }
+            server::start_server(config, server);
 
             break;
         }

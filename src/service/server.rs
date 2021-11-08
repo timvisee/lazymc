@@ -6,6 +6,7 @@ use tokio::net::TcpListener;
 use crate::config::Config;
 use crate::proto::Client;
 use crate::proxy;
+use crate::server;
 use crate::server::ServerState;
 use crate::service;
 use crate::status;
@@ -39,6 +40,11 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         server_state.clone(),
     ));
     tokio::spawn(service::signal::service(server_state.clone()));
+
+    // Initiate server start
+    if !config.server.sleep_on_start {
+        server::start_server(config.clone(), server_state.clone());
+    }
 
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {

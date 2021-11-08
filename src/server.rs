@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
 
@@ -146,8 +147,27 @@ impl ServerState {
     }
 }
 
-/// Start Minecraft server.
-pub async fn start(
+/// Try to start the server.
+///
+/// Does not start if alreayd starting.
+// TODO: move this into server state struct?
+pub fn start_server(config: Arc<Config>, server: Arc<ServerState>) {
+    // Ensure it is not starting yet
+    if server.starting() {
+        return;
+    }
+
+    // Update starting states
+    // TODO: this may data race, use single atomic operation
+    server.set_starting(true);
+    server.update_last_active_time();
+
+    // Spawn server in separate task
+    tokio::spawn(invoke_server_command(config, server).map(|_| ()));
+}
+
+/// Invoke server command, store PID and wait for it to quit.
+pub async fn invoke_server_command(
     config: Arc<Config>,
     state: Arc<ServerState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
