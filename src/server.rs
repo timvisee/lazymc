@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
 
 use crate::config::SERVER_CMD;
@@ -16,6 +17,11 @@ pub struct ServerState {
 
     /// Server PID.
     pid: Mutex<Option<u32>>,
+
+    /// Last known server status.
+    ///
+    /// Once set, this will remain set, and isn't cleared when the server goes offline.
+    status: Mutex<Option<ServerStatus>>,
 }
 
 impl ServerState {
@@ -53,6 +59,11 @@ impl ServerState {
     /// Set server PID.
     pub fn set_pid(&self, pid: Option<u32>) {
         *self.pid.lock().unwrap() = pid;
+    }
+
+    /// Update the server status.
+    pub fn set_status(&self, status: ServerStatus) {
+        self.status.lock().unwrap().replace(status);
     }
 }
 

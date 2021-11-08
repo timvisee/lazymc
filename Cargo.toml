@@ -22,8 +22,7 @@ edition = "2021"
 bytes = "1.1"
 futures = { version = "0.3", default-features = false }
 libc = "0.2"
-minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "c578492" }
-rand = "0.8"
+minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "c181117" }
 tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "io-util", "net", "macros", "time", "process", "signal"] }
 
 dotenv = "0.15"
