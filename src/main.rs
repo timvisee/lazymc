@@ -24,7 +24,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use config::*;
-use proto::{Client, ClientState, RawPacket};
+use proto::{Client, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL, PROTO_DEFAULT_VERSION};
 use server::ServerState;
 
 #[tokio::main]
@@ -157,22 +157,32 @@ async fn serve_status(
 
         // Hijack server status packet
         if client.state() == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_STATUS {
-            // Build status response
-            // TODO: grab latest protocol version from online server!
+            // Select version and player max from last known server status
+            let (version, max) = match server.clone_status() {
+                Some(status) => (status.version, status.players.max),
+                None => (
+                    ServerVersion {
+                        name: String::from(PROTO_DEFAULT_VERSION),
+                        protocol: PROTO_DEFAULT_PROTOCOL,
+                    },
+                    0,
+                ),
+            };
+
+            // Select description
             let description = if server.starting() {
                 LABEL_SERVER_STARTING
             } else {
                 LABEL_SERVER_SLEEPING
             };
+
+            // Build status resposne
             let server_status = ServerStatus {
-                version: ServerVersion {
-                    name: String::from("1.16.5"),
-                    protocol: 754,
-                },
+                version,
                 description: Message::new(Payload::text(description)),
                 players: OnlinePlayers {
                     online: 0,
-                    max: 0,
+                    max,
                     sample: vec![],
                 },
             };

@@ -21,7 +21,8 @@ pub struct ServerState {
     /// Last known server status.
     ///
     /// Once set, this will remain set, and isn't cleared when the server goes offline.
-    status: Mutex<Option<ServerStatus>>,
+    // TODO: make this private?
+    pub status: Mutex<Option<ServerStatus>>,
 }
 
 impl ServerState {
@@ -59,6 +60,11 @@ impl ServerState {
     /// Set server PID.
     pub fn set_pid(&self, pid: Option<u32>) {
         *self.pid.lock().unwrap() = pid;
+    }
+
+    /// Clone the last known server status.
+    pub fn clone_status(&self) -> Option<ServerStatus> {
+        self.status.lock().unwrap().clone()
     }
 
     /// Update the server status.

@@ -7,13 +7,31 @@ use tokio::net::tcp::ReadHalf;
 
 use crate::types;
 
+/// Default minecraft protocol version name.
+///
+/// Send to clients when the server is sleeping when the real server version is not known yet.
+pub const PROTO_DEFAULT_VERSION: &str = "1.16.5";
+
+/// Default minecraft protocol version.
+///
+/// Send to clients when the server is sleeping when the real server version is not known yet, and
+/// with server status polling requests.
+pub const PROTO_DEFAULT_PROTOCOL: u32 = 754;
+
+/// Handshake state, handshake packet ID.
 pub const HANDSHAKE_PACKET_ID_HANDSHAKE: i32 = 0;
+
+/// Status state, status packet ID.
 pub const STATUS_PACKET_ID_STATUS: i32 = 0;
+
+/// Status state, ping packet ID.
 pub const STATUS_PACKET_ID_PING: i32 = 1;
+
+/// Login state, login start packet ID.
 pub const LOGIN_PACKET_ID_LOGIN_START: i32 = 0;
 
 /// Client state.
-// TODO: add encryption/compression state
+// TODO: add encryption/compression state?
 #[derive(Debug, Default)]
 pub struct Client {
     /// Current client state.
@@ -120,6 +138,10 @@ impl RawPacket {
 }
 
 /// Read raw packet from stream.
+///
+/// Note: this does not support reading compressed/encrypted packets.
+/// We should never need this though, as we're done reading user packets before any of this is
+/// enabled. See: https://wiki.vg/Protocol#Packet_format
 pub async fn read_packet<'a>(
     buf: &mut BytesMut,
     stream: &mut ReadHalf<'a>,

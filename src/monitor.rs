@@ -13,11 +13,8 @@ use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
-use crate::proto::{self, ClientState, RawPacket};
+use crate::proto::{self, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL};
 use crate::server::ServerState;
-
-/// Minecraft protocol version used when polling server status.
-const PROTOCOL_VERSION: i32 = 754;
 
 /// Monitor ping inverval in seconds.
 const MONITOR_PING_INTERVAL: u64 = 2;
@@ -37,6 +34,7 @@ pub async fn monitor_server(addr: SocketAddr, state: Arc<ServerState>) {
             state.set_status(status);
         }
 
+        // TODO: use interval instead, for a more reliable polling interval?
         tokio::time::sleep(Duration::from_secs(MONITOR_PING_INTERVAL)).await;
     }
 }
@@ -60,7 +58,7 @@ async fn fetch_status(addr: SocketAddr) -> Result<ServerStatus, ()> {
 /// Send handshake.
 async fn send_handshake(stream: &mut TcpStream, addr: SocketAddr) -> Result<(), ()> {
     let handshake = Handshake {
-        protocol_version: PROTOCOL_VERSION,
+        protocol_version: PROTO_DEFAULT_PROTOCOL as i32,
         server_addr: addr.ip().to_string(),
         server_port: addr.port(),
         next_state: ClientState::Status.to_id(),
@@ -72,7 +70,6 @@ async fn send_handshake(stream: &mut TcpStream, addr: SocketAddr) -> Result<(), 
     let raw = RawPacket::new(proto::HANDSHAKE_PACKET_ID_HANDSHAKE, packet)
         .encode()
         .map_err(|_| ())?;
-
     stream.write_all(&raw).await.map_err(|_| ())?;
 
     Ok(())
