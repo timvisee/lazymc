@@ -1,17 +1,28 @@
 #[macro_use]
+extern crate anyhow;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate derive_builder;
+#[macro_use]
 extern crate log;
 
+pub(crate) mod action;
+pub(crate) mod cli;
 pub(crate) mod config;
 pub(crate) mod monitor;
 pub(crate) mod proto;
 pub(crate) mod server;
 pub(crate) mod types;
+pub(crate) mod util;
 
 use std::error::Error;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::BytesMut;
+use clap::{App, ArgMatches};
 use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
@@ -24,10 +35,12 @@ use tokio::io;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 
+use crate::util::error::{quit_error, quit_error_msg, ErrorHints, ErrorHintsBuilder};
 use config::*;
 use proto::{Client, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL, PROTO_DEFAULT_VERSION};
 use server::ServerState;
 
+/// Main entrypoint.
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     // Initialize logging
@@ -35,16 +48,79 @@ async fn main() -> Result<(), ()> {
     let _ = dotenv::dotenv();
     pretty_env_logger::init();
 
+    // Build clap app, invoke intended action
+    let app = cli::app();
+    invoke_action(app).await
+}
+
+/// Invoke an action.
+async fn invoke_action<'a>(app: App<'a>) -> Result<(), ()> {
+    let matches = app.get_matches();
+
+    // Config operations
+    if let Some(ref matches) = matches.subcommand_matches("config") {
+        if let Some(ref matches) = matches.subcommand_matches("generate") {
+            action::config_generate::invoke(matches);
+            return Ok(());
+        }
+
+        if let Some(ref matches) = matches.subcommand_matches("test") {
+            action::config_test::invoke(matches);
+            return Ok(());
+        }
+
+        unimplemented!("Config logic here!");
+    }
+
+    // Start server
+    start(&matches).await
+}
+
+/// Load configuration file.
+fn load_config(matches: &ArgMatches) -> Config {
+    // Get config path, attempt to canonicalize
+    let mut path = PathBuf::from(matches.value_of("config").unwrap());
+    if let Ok(p) = path.canonicalize() {
+        path = p;
+    }
+
+    // Ensure configuration file exists
+    if !path.is_file() {
+        quit_error_msg(
+            format!(
+                "Conig file does not exist: {}",
+                path.to_str().unwrap_or("?")
+            ),
+            ErrorHintsBuilder::default()
+                .config(true)
+                .config_generate(true)
+                .build()
+                .unwrap(),
+        );
+    }
+
     // Load config
-    let config = match Config::load() {
-        Ok(config) => Arc::new(config),
+    let config = match Config::load(path) {
+        Ok(config) => config,
         Err(err) => {
-            error!("Failed to load configuration:");
-            error!("{}", err);
-            return Err(());
+            quit_error(
+                anyhow!(err).context("Failed to load config"),
+                ErrorHintsBuilder::default()
+                    .config(true)
+                    .config_test(true)
+                    .build()
+                    .unwrap(),
+            );
         }
     };
 
+    config
+}
+
+/// Start lazymc.
+async fn start(matches: &ArgMatches) -> Result<(), ()> {
+    // Load config and server state
+    let config = Arc::new(load_config(matches));
     let server_state = Arc::new(ServerState::default());
 
     // Listen for new connections
@@ -52,8 +128,10 @@ async fn main() -> Result<(), ()> {
     let listener = TcpListener::bind(config.public.address)
         .await
         .map_err(|err| {
-            error!("Failed to start: {}", err);
-            ()
+            quit_error(
+                anyhow!(err).context("Failed to start proxy server"),
+                ErrorHints::default(),
+            );
         })?;
 
     info!(

@@ -1,12 +1,12 @@
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 /// Default configuration file location.
-const CONFIG_FILE: &str = "lazymc.toml";
+pub const CONFIG_FILE: &str = "lazymc.toml";
 
 /// Configuration.
 #[derive(Debug, Deserialize)]
@@ -26,8 +26,8 @@ pub struct Config {
 
 impl Config {
     /// Load configuration form file.
-    pub fn load() -> Result<Self, io::Error> {
-        let data = fs::read(CONFIG_FILE)?;
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, io::Error> {
+        let data = fs::read(path)?;
         let config = toml::from_slice(&data)?;
         Ok(config)
     }
