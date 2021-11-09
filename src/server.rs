@@ -64,7 +64,7 @@ impl ServerState {
     pub fn kill_server(&self) -> bool {
         if let Some(pid) = *self.pid.lock().unwrap() {
             debug!(target: "lazymc", "Sending kill signal to server");
-            kill_gracefully(pid);
+            crate::os::unix::kill_gracefully(pid);
 
             // TODO: should we set this?
             self.set_online(false);

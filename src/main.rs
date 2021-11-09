@@ -12,6 +12,7 @@ pub(crate) mod cli;
 pub(crate) mod config;
 pub(crate) mod mc;
 pub(crate) mod monitor;
+pub(crate) mod os;
 pub(crate) mod proto;
 pub(crate) mod proxy;
 pub(crate) mod server;
