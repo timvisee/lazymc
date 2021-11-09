@@ -1,10 +1,8 @@
 # lazymc configuration
 
 [public]
-# Egress address.
-#
-# Public IP and port users will connect to.
-# Shows sleeping status, starts server on connect, and proxies to ingress server.
+# Public address. IP and port users connect to.
+# Shows sleeping status, starts server on connect, and proxies to server.
 address = "0.0.0.0:25565"
 
 [server]
@@ -12,13 +10,10 @@ address = "0.0.0.0:25565"
 directory = "."
 
 # Command to start the server.
-#
-# Warning: if using a bash script, see: https://github.com/timvisee/lazymc/blob/master/docs/command_bash.md
+# Warning: if using a bash script read: https://github.com/timvisee/lazymc/blob/master/docs/command_bash.md
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
-# Ingress address.
-#
-# Internal IP and port of server started by lazymc to proxy to.
+# Server address. Internal IP and port of server started by lazymc to proxy to.
 address = "127.0.0.1:25566"
 
 # Immediately wake server when starting lazymc.
