@@ -1,20 +1,36 @@
 # lazymc configuration
+#
+# You must configure your server directory and start command, see:
+# - server.directory
+# - server.command
+#
+# You can probably leave the rest as-is.
+#
+# You may generate a new configuration with: lazymc config generate
+# Or find the latest at: https://is.gd/WWBIQu
 
 [public]
 # Public address. IP and port users connect to.
 # Shows sleeping status, starts server on connect, and proxies to server.
 address = "0.0.0.0:25565"
 
+# Server version & protocol hint.
+# Sent to clients until actual server version is known.
+# See: https://is.gd/FTQKTP
+version = "1.17.1"
+protocol = 756
+
 [server]
-# Server directory.
+# Server address. Internal IP and port of server started by lazymc to proxy to.
+# Port must be different from public port.
+address = "127.0.0.1:25566"
+
+# Server directory, defaults to current directory.
 directory = "."
 
 # Command to start the server.
-# Warning: if using a bash script read: https://github.com/timvisee/lazymc/blob/master/docs/command_bash.md
+# Warning: if using a bash script read: https://is.gd/k8SQYv
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
-
-# Server address. Internal IP and port of server started by lazymc to proxy to.
-address = "127.0.0.1:25566"
 
 # Immediately wake server when starting lazymc.
 wake_on_start = false
@@ -27,19 +43,13 @@ sleep_after = 60
 minimum_online_time = 60
 
 [messages]
-# MOTD when server is sleeping.
+# MOTDs, shown in server browser.
 motd_sleeping = "☠ Server is sleeping\n§2☻ Join to start it up"
-
-# MOTD when server is starting.
 motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
-
-# MOTD when server is stopping.
 motd_stopping = "☠ Server going to sleep...\n⌛ Please wait..."
 
-# Login (kick) message when server is starting.
+# Login messages, when user tries to connect.
 login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
-
-# Login (kick) message when server is stopping.
 login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
 
 [rcon]
@@ -47,13 +57,12 @@ login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconne
 # Must be enabled on Windows.
 enabled = true
 
-# Server RCON port. Must differ from Minecraft server port.
+# Server RCON port. Must differ from public and server port.
 port = 25575
 
 # Server RCON password.
+# Or whether to randomize password each start (recommended).
 password = ""
-
-# Randomize ingress server RCON password on each start.
 randomize_password = true
 
 [advanced]

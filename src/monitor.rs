@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::config::Config;
-use crate::proto::{self, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL};
+use crate::proto::{self, ClientState, RawPacket};
 use crate::server::Server;
 
 /// Monitor ping inverval in seconds.
@@ -31,7 +31,7 @@ pub async fn monitor_server(config: Arc<Config>, state: Arc<Server>) {
     loop {
         // Poll server state and update internal status
         trace!(target: "lazymc::monitor", "Fetching status for {} ... ", addr);
-        let status = poll_server(addr).await;
+        let status = poll_server(&config, addr).await;
         state.update_status(&config, status);
 
         // Sleep server when it's bedtime
@@ -50,23 +50,27 @@ pub async fn monitor_server(config: Arc<Config>, state: Arc<Server>) {
 /// Poll server state.
 ///
 /// Returns server status if connection succeeded.
-pub async fn poll_server(addr: SocketAddr) -> Option<ServerStatus> {
-    fetch_status(addr).await.ok()
+pub async fn poll_server(config: &Config, addr: SocketAddr) -> Option<ServerStatus> {
+    fetch_status(config, addr).await.ok()
 }
 
 /// Attemp to fetch status from server.
-async fn fetch_status(addr: SocketAddr) -> Result<ServerStatus, ()> {
+async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus, ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
-    send_handshake(&mut stream, addr).await?;
+    send_handshake(&mut stream, &config, addr).await?;
     request_status(&mut stream).await?;
     wait_for_status_timeout(&mut stream).await
 }
 
 /// Send handshake.
-async fn send_handshake(stream: &mut TcpStream, addr: SocketAddr) -> Result<(), ()> {
+async fn send_handshake(
+    stream: &mut TcpStream,
+    config: &Config,
+    addr: SocketAddr,
+) -> Result<(), ()> {
     let handshake = Handshake {
-        protocol_version: PROTO_DEFAULT_PROTOCOL as i32,
+        protocol_version: config.public.protocol as i32,
         server_addr: addr.ip().to_string(),
         server_port: addr.port(),
         next_state: ClientState::Status.to_id(),

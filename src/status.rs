@@ -13,9 +13,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::config::*;
-use crate::proto::{
-    self, Client, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL, PROTO_DEFAULT_VERSION,
-};
+use crate::proto::{self, Client, ClientState, RawPacket};
 use crate::server::{self, Server};
 
 /// Proxy the given inbound stream to a target address.
@@ -88,8 +86,8 @@ pub async fn serve(
                 Some(status) => (status.version, status.players.max),
                 None => (
                     ServerVersion {
-                        name: String::from(PROTO_DEFAULT_VERSION),
-                        protocol: PROTO_DEFAULT_PROTOCOL,
+                        name: config.public.version.clone(),
+                        protocol: config.public.protocol,
                     },
                     0,
                 ),

@@ -10,13 +10,13 @@ use crate::types;
 /// Default minecraft protocol version name.
 ///
 /// Send to clients when the server is sleeping when the real server version is not known yet.
-pub const PROTO_DEFAULT_VERSION: &str = "1.16.5";
+pub const PROTO_DEFAULT_VERSION: &str = "1.17.1";
 
 /// Default minecraft protocol version.
 ///
 /// Send to clients when the server is sleeping when the real server version is not known yet, and
 /// with server status polling requests.
-pub const PROTO_DEFAULT_PROTOCOL: u32 = 754;
+pub const PROTO_DEFAULT_PROTOCOL: u32 = 756;
 
 /// Handshake state, handshake packet ID.
 pub const HANDSHAKE_PACKET_ID_HANDSHAKE: i32 = 0;

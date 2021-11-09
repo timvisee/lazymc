@@ -91,6 +91,12 @@ pub struct Public {
     /// Egress address.
     #[serde(alias = "address_egress")]
     pub address: SocketAddr,
+
+    /// Minecraft protocol version name hint.
+    pub version: String,
+
+    /// Minecraft protocol version hint.
+    pub protocol: u32,
 }
 
 /// Server configuration.
