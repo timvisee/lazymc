@@ -7,16 +7,12 @@ pub struct Rcon {
 
 impl Rcon {
     /// Connect to a host.
-    pub async fn connect(addr: &str, pass: &str) -> Result<Self, ()> {
+    pub async fn connect(addr: &str, pass: &str) -> Result<Self, Box<dyn std::error::Error>> {
         // Start connection
         let con = Connection::builder()
             .enable_minecraft_quirks(true)
             .connect(addr, pass)
-            .await
-            .map_err(|err| {
-                dbg!(err);
-                ()
-            })?;
+            .await?;
 
         Ok(Self { con })
     }

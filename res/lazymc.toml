@@ -33,8 +33,14 @@ motd_sleeping = "☠ Server is sleeping\n§2☻ Join to start it up"
 # MOTD when server is starting.
 motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
 
+# MOTD when server is stopping.
+motd_stopping = "☠ Server going to sleep...\n⌛ Please wait..."
+
 # Login (kick) message when server is starting.
 login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
+
+# Login (kick) message when server is stopping.
+login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
 
 [rcon]
 # Enable sleeping server through RCON.

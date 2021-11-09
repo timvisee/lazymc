@@ -16,7 +16,7 @@ use crate::config::*;
 use crate::proto::{
     self, Client, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL, PROTO_DEFAULT_VERSION,
 };
-use crate::server::{self, ServerState};
+use crate::server::{self, Server};
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
@@ -24,7 +24,7 @@ pub async fn serve(
     client: Client,
     mut inbound: TcpStream,
     config: Arc<Config>,
-    server: Arc<ServerState>,
+    server: Arc<Server>,
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
@@ -44,20 +44,26 @@ pub async fn serve(
 
         // Hijack login start
         if client.state() == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
+            // Select message
+            let msg = match server.state() {
+                server::State::Starting | server::State::Stopped | server::State::Started => {
+                    &config.messages.login_starting
+                }
+                server::State::Stopping => &config.messages.login_stopping,
+            };
+
             let packet = LoginDisconnect {
-                reason: Message::new(Payload::text(&config.messages.login_starting)),
+                reason: Message::new(Payload::text(msg)),
             };
 
             let mut data = Vec::new();
             packet.encode(&mut data).map_err(|_| ())?;
 
             let response = RawPacket::new(0, data).encode()?;
-
             writer.write_all(&response).await.map_err(|_| ())?;
 
             // Start server if not starting yet
-            server::start_server(config, server);
-
+            Server::start(config, server);
             break;
         }
 
@@ -90,10 +96,10 @@ pub async fn serve(
             };
 
             // Select description
-            let description = if server.starting() {
-                &config.messages.motd_starting
-            } else {
-                &config.messages.motd_sleeping
+            let description = match server.state() {
+                server::State::Stopped | server::State::Started => &config.messages.motd_sleeping,
+                server::State::Starting => &config.messages.motd_starting,
+                server::State::Stopping => &config.messages.motd_stopping,
             };
 
             // Build status resposne

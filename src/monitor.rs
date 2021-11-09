@@ -15,7 +15,7 @@ use tokio::net::TcpStream;
 
 use crate::config::Config;
 use crate::proto::{self, ClientState, RawPacket, PROTO_DEFAULT_PROTOCOL};
-use crate::server::ServerState;
+use crate::server::Server;
 
 /// Monitor ping inverval in seconds.
 const MONITOR_PING_INTERVAL: u64 = 2;
@@ -24,7 +24,7 @@ const MONITOR_PING_INTERVAL: u64 = 2;
 const STATUS_TIMEOUT: u64 = 8;
 
 /// Monitor server.
-pub async fn monitor_server(config: Arc<Config>, state: Arc<ServerState>) {
+pub async fn monitor_server(config: Arc<Config>, state: Arc<Server>) {
     // Server address
     let addr = config.server.address;
 
@@ -37,7 +37,7 @@ pub async fn monitor_server(config: Arc<Config>, state: Arc<ServerState>) {
         // Sleep server when it's bedtime
         if state.should_sleep(&config) {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
-            if !state.kill_server(&config).await {
+            if !state.stop(&config).await {
                 warn!(target: "lazymc", "Failed to stop server");
             }
         }

@@ -131,8 +131,14 @@ pub struct Messages {
     /// MOTD when server is starting.
     pub motd_starting: String,
 
+    /// MOTD when server is stopping.
+    pub motd_stopping: String,
+
     /// Login message when server is starting.
     pub login_starting: String,
+
+    /// Login message when server is stopping.
+    pub login_stopping: String,
 }
 
 /// RCON configuration.

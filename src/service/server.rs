@@ -6,8 +6,7 @@ use tokio::net::TcpListener;
 use crate::config::Config;
 use crate::proto::Client;
 use crate::proxy;
-use crate::server;
-use crate::server::ServerState;
+use crate::server::{self, Server};
 use crate::service;
 use crate::status;
 use crate::util::error::{quit_error, ErrorHints};
@@ -15,7 +14,7 @@ use crate::util::error::{quit_error, ErrorHints};
 /// Start lazymc.
 pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     // Load server state
-    let server_state = Arc::new(ServerState::default());
+    let server = Arc::new(Server::default());
 
     // Listen for new connections
     // TODO: do not drop error here
@@ -35,28 +34,23 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     );
 
     // Spawn server monitor and signal handler services
-    tokio::spawn(service::monitor::service(
-        config.clone(),
-        server_state.clone(),
-    ));
-    tokio::spawn(service::signal::service(
-        config.clone(),
-        server_state.clone(),
-    ));
+    tokio::spawn(service::monitor::service(config.clone(), server.clone()));
+    tokio::spawn(service::signal::service(config.clone(), server.clone()));
 
     // Initiate server start
     if config.server.wake_on_start {
-        server::start_server(config.clone(), server_state.clone());
+        Server::start(config.clone(), server.clone());
     }
 
     // Proxy all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
         let client = Client::default();
 
-        if !server_state.online() {
+        let online = server.state() == server::State::Started;
+        if !online {
             // When server is not online, spawn a status server
-            let transfer = status::serve(client, inbound, config.clone(), server_state.clone())
-                .map(|r| {
+            let transfer =
+                status::serve(client, inbound, config.clone(), server.clone()).map(|r| {
                     if let Err(err) = r {
                         warn!(target: "lazymc", "Failed to serve status: {:?}", err);
                     }

@@ -54,7 +54,7 @@ lazymc --help
 ```
 
 When `lazymc` is available, change into your server directory. Then set up the
-configuration and start it up:
+[configuration](./res/lazymc.toml) and start it up:
 
 ```bash
 # Change into your server directory

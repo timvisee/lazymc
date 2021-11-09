@@ -1,21 +1,32 @@
 use std::sync::Arc;
 
 use crate::config::Config;
-use crate::server::ServerState;
+use crate::server::{self, Server};
+use crate::util::error;
 
 /// Signal handler task.
-pub async fn service(config: Arc<Config>, server_state: Arc<ServerState>) {
+pub async fn service(config: Arc<Config>, server: Arc<Server>) {
     loop {
         // Wait for SIGTERM/SIGINT signal
         tokio::signal::ctrl_c().await.unwrap();
 
-        // Attemp to kill server
-        let killed = !server_state.kill_server(&config).await;
+        // Quit if stopped
+        if server.state() == server::State::Stopped {
+            quit();
+        }
 
-        // If we don't kill the server, quit this process
-        if !killed {
-            // TODO: gracefully kill itself instead
-            std::process::exit(1)
+        // Try to stop server
+        let stopping = server.stop(&config).await;
+
+        // If not stopping, maybe due to failure, just quit
+        if !stopping {
+            quit();
         }
     }
+}
+
+/// Gracefully quit.
+fn quit() -> ! {
+    // TODO: gracefully quit self
+    error::quit();
 }
