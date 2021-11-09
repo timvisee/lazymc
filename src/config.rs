@@ -69,6 +69,9 @@ pub struct Config {
     /// Messages, shown to the user.
     pub messages: Messages,
 
+    /// RCON configuration.
+    pub rcon: Rcon,
+
     /// Advanced configuration.
     pub advanced: Advanced,
 }
@@ -130,6 +133,22 @@ pub struct Messages {
 
     /// Login message when server is starting.
     pub login_starting: String,
+}
+
+/// RCON configuration.
+#[derive(Debug, Deserialize)]
+pub struct Rcon {
+    /// Enable sleeping server through RCON.
+    pub enabled: bool,
+
+    /// Server RCON port.
+    pub port: u16,
+
+    /// Server RCON password.
+    pub password: String,
+
+    /// Randomize ingress server RCON password on each start.
+    pub randomize_password: bool,
 }
 
 /// Advanced configuration.

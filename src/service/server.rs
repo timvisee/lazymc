@@ -39,7 +39,10 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         config.clone(),
         server_state.clone(),
     ));
-    tokio::spawn(service::signal::service(server_state.clone()));
+    tokio::spawn(service::signal::service(
+        config.clone(),
+        server_state.clone(),
+    ));
 
     // Initiate server start
     if config.server.wake_on_start {

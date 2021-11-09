@@ -77,7 +77,7 @@ pub fn rewrite_file(file: &Path, changes: HashMap<&str, String>) {
     match fs::write(file, contents) {
         Ok(_) => {
             info!(target: "lazymc",
-                "Rewritten {} file with correct IP and port",
+                "Rewritten {} file with updated values",
                 FILE,
             );
         }

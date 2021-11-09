@@ -28,8 +28,9 @@ https://user-images.githubusercontent.com/856222/140804726-ba1a8e59-85d9-413b-82
 
 ## Requirements
 
-- Linux, macOS (Windows not yet supported)
+- Linux, macOS, Windows
 - Minecraft Java Edition 1.6 or above
+- On Windows: RCON (automatically managed by default)
 
 Using a modded Minecraft server and client (such as Forge) should work fine.
 

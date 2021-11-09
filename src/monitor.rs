@@ -37,7 +37,9 @@ pub async fn monitor_server(config: Arc<Config>, state: Arc<ServerState>) {
         // Sleep server when it's bedtime
         if state.should_sleep(&config) {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
-            state.kill_server();
+            if !state.kill_server(&config).await {
+                warn!(target: "lazymc", "Failed to stop server");
+            }
         }
 
         // TODO: use interval instead, for a more reliable polling interval?

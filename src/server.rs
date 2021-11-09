@@ -61,20 +61,31 @@ impl ServerState {
     }
 
     /// Kill any running server.
-    pub fn kill_server(&self) -> bool {
-        if let Some(pid) = *self.pid.lock().unwrap() {
-            debug!(target: "lazymc", "Sending kill signal to server");
-            crate::os::unix::kill_gracefully(pid);
+    #[allow(unused_variables)]
+    pub async fn kill_server(&self, config: &Config) -> bool {
+        // Ensure we have a running process
+        let has_process = self.pid.lock().unwrap().is_some();
+        if !has_process {
+            return false;
+        }
 
-            // TODO: should we set this?
-            self.set_online(false);
-            self.set_keep_online_until(None);
+        // Try to kill through RCON
+        #[cfg(feature = "rcon")]
+        if stop_server_rcon(config, &self).await {
+            // TODO: set stopping state elsewhere
+            self.stopping.store(true, Ordering::Relaxed);
 
             return true;
         }
 
-        // TODO: set stopping state elsewhere
-        self.stopping.store(true, Ordering::Relaxed);
+        // Try to kill through signal
+        #[cfg(unix)]
+        if stop_server_signal(&self) {
+            // TODO: set stopping state elsewhere
+            self.stopping.store(true, Ordering::Relaxed);
+
+            return true;
+        }
 
         false
     }
@@ -240,22 +251,62 @@ pub async fn invoke_server_command(
     Ok(())
 }
 
-/// Gracefully kill process.
-fn kill_gracefully(pid: u32) {
-    #[cfg(unix)]
-    unsafe {
-        debug!(target: "lazymc", "Sending SIGTERM signal to {} to kill server", pid);
-        let result = libc::kill(pid as i32, libc::SIGTERM);
-        trace!(target: "lazymc", "SIGTERM result: {}", result);
+/// Stop server through RCON.
+#[cfg(feature = "rcon")]
+async fn stop_server_rcon(config: &Config, server: &ServerState) -> bool {
+    use crate::mc::rcon::Rcon;
 
-        // TODO: send sigterm to childs as well?
-        // TODO: handle error if != 0
+    // RCON must be enabled
+    if !config.rcon.enabled {
+        return false;
     }
 
-    // TODO: implement for Windows
-    #[cfg(not(unix))]
-    {
-        // TODO: implement this for Windows
-        unimplemented!();
+    // RCON address
+    let mut addr = config.server.address.clone();
+    addr.set_port(config.rcon.port);
+    let addr = addr.to_string();
+
+    // Create RCON client
+    let mut rcon = match Rcon::connect(&addr, &config.rcon.password).await {
+        Ok(rcon) => rcon,
+        Err(_) => {
+            error!(target: "lazymc", "failed to create RCON client to sleep server");
+            return false;
+        }
+    };
+
+    // Invoke save-all
+    if let Err(err) = rcon.cmd("save-all").await {
+        error!(target: "lazymc", "failed to invoke save-all through RCON, ignoring: {}", err);
     }
+
+    // Invoke stop
+    if let Err(err) = rcon.cmd("stop").await {
+        error!(target: "lazymc", "failed to invoke stop through RCON: {}", err);
+    }
+
+    // TODO: should we set this?
+    server.set_online(false);
+    server.set_keep_online_until(None);
+
+    true
+}
+
+/// Stop server by sending SIGTERM signal.
+///
+/// Only works on Unix.
+#[cfg(unix)]
+fn stop_server_signal(server: &ServerState) -> bool {
+    if let Some(pid) = *server.pid.lock().unwrap() {
+        debug!(target: "lazymc", "Sending kill signal to server");
+        crate::os::kill_gracefully(pid);
+
+        // TODO: should we set this?
+        server.set_online(false);
+        server.set_keep_online_until(None);
+
+        return true;
+    }
+
+    false
 }
