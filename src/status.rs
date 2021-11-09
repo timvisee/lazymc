@@ -6,7 +6,7 @@ use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
-use minecraft_protocol::version::v1_14_4::login::LoginDisconnect;
+use minecraft_protocol::version::v1_14_4::login::{LoginDisconnect, LoginStart};
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::io;
 use tokio::io::AsyncWriteExt;
@@ -42,6 +42,11 @@ pub async fn serve(
 
         // Hijack login start
         if client.state() == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
+            // Try to get login username
+            let username = LoginStart::decode(&mut packet.data.as_slice())
+                .ok()
+                .map(|p| p.name);
+
             // Select message
             let msg = match server.state() {
                 server::State::Starting | server::State::Stopped | server::State::Started => {
@@ -61,7 +66,7 @@ pub async fn serve(
             writer.write_all(&response).await.map_err(|_| ())?;
 
             // Start server if not starting yet
-            Server::start(config, server);
+            Server::start(config, server, username);
             break;
         }
 

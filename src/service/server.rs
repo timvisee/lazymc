@@ -39,7 +39,7 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
 
     // Initiate server start
     if config.server.wake_on_start {
-        Server::start(config.clone(), server.clone());
+        Server::start(config.clone(), server.clone(), None);
     }
 
     // Proxy all incomming connections

@@ -127,10 +127,16 @@ impl Server {
     /// Try to start the server.
     ///
     /// Does nothing if currently not in stopped state.
-    pub fn start(config: Arc<Config>, server: Arc<Server>) -> bool {
+    pub fn start(config: Arc<Config>, server: Arc<Server>, username: Option<String>) -> bool {
         // Must set state from stopped to starting
         if !server.update_state_from(Some(State::Stopped), State::Starting, &config) {
             return false;
+        }
+
+        // Log starting message
+        match username {
+            Some(username) => info!(target: "lazymc", "Starting server for '{}'...", username),
+            None => info!(target: "lazymc", "Starting server..."),
         }
 
         // Invoke server command in separate task
@@ -254,7 +260,6 @@ pub async fn invoke_server_cmd(
     }
 
     // Spawn process
-    info!(target: "lazymc", "Starting server...");
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
