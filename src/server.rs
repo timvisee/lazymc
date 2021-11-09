@@ -275,11 +275,6 @@ async fn stop_server_rcon(config: &Config, server: &ServerState) -> bool {
         }
     };
 
-    // Invoke save-all
-    if let Err(err) = rcon.cmd("save-all").await {
-        error!(target: "lazymc", "failed to invoke save-all through RCON, ignoring: {}", err);
-    }
-
     // Invoke stop
     if let Err(err) = rcon.cmd("stop").await {
         error!(target: "lazymc", "failed to invoke stop through RCON: {}", err);
