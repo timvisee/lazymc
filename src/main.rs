@@ -24,6 +24,9 @@ use std::env;
 
 use clap::App;
 
+/// Default log level if none is set.
+const LOG_DEFAULT: &str = "info";
+
 /// Main entrypoint.
 #[tokio::main]
 async fn main() -> Result<(), ()> {
@@ -37,9 +40,13 @@ async fn main() -> Result<(), ()> {
 
 /// Initialize logger.
 fn init_log() {
-    // Set default log level, load from .env
-    env::set_var("RUST_LOG", "info");
+    // Load .env variables
     let _ = dotenv::dotenv();
+
+    // Set default log level if none is set
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", LOG_DEFAULT);
+    }
 
     // Initialize logger
     pretty_env_logger::init();
