@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::ArgMatches;
 use serde::Deserialize;
 
+use crate::proto;
 use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
 
 /// Default configuration file location.
@@ -58,21 +59,26 @@ pub fn load(matches: &ArgMatches) -> Config {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     /// Public configuration.
+    #[serde(default)]
     pub public: Public,
 
     /// Server configuration.
     pub server: Server,
 
     /// Time configuration.
+    #[serde(default)]
     pub time: Time,
 
     /// Messages, shown to the user.
+    #[serde(default)]
     pub messages: Messages,
 
     /// RCON configuration.
+    #[serde(default)]
     pub rcon: Rcon,
 
     /// Advanced configuration.
+    #[serde(default)]
     pub advanced: Advanced,
 }
 
@@ -87,9 +93,9 @@ impl Config {
 
 /// Public configuration.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Public {
-    /// Egress address.
-    #[serde(alias = "address_egress")]
+    /// Public address.
     pub address: SocketAddr,
 
     /// Minecraft protocol version name hint.
@@ -99,17 +105,28 @@ pub struct Public {
     pub protocol: u32,
 }
 
+impl Default for Public {
+    fn default() -> Self {
+        Self {
+            address: "0.0.0.0:25565".parse().unwrap(),
+            version: proto::PROTO_DEFAULT_VERSION.to_string(),
+            protocol: proto::PROTO_DEFAULT_PROTOCOL,
+        }
+    }
+}
+
 /// Server configuration.
 #[derive(Debug, Deserialize)]
 pub struct Server {
     /// Server directory.
+    #[serde(default = "option_pathbuf_dot")]
     pub directory: Option<PathBuf>,
 
     /// Start command.
     pub command: String,
 
-    /// Ingress address.
-    #[serde(alias = "address_ingress")]
+    /// Server address.
+    #[serde(default = "server_address_default")]
     pub address: SocketAddr,
 
     /// Immediately wake server when starting lazymc.
@@ -119,6 +136,7 @@ pub struct Server {
 
 /// Time configuration.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Time {
     /// Sleep after number of seconds.
     pub sleep_after: u32,
@@ -128,8 +146,18 @@ pub struct Time {
     pub min_online_time: u32,
 }
 
+impl Default for Time {
+    fn default() -> Self {
+        Self {
+            sleep_after: 60,
+            min_online_time: 60,
+        }
+    }
+}
+
 /// Message configuration.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Messages {
     /// MOTD when server is sleeping.
     pub motd_sleeping: String,
@@ -147,8 +175,21 @@ pub struct Messages {
     pub login_stopping: String,
 }
 
+impl Default for Messages {
+    fn default() -> Self {
+        Self {
+            motd_sleeping: "☠ Server is sleeping\n§2☻ Join to start it up".into(),
+            motd_starting: "§2☻ Server is starting...\n§7⌛ Please wait...".into(),
+            motd_stopping: "☠ Server going to sleep...\n⌛ Please wait...".into(),
+            login_starting: "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.".into(),
+            login_stopping: "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again.".into(),
+        }
+    }
+}
+
 /// RCON configuration.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Rcon {
     /// Enable sleeping server through RCON.
     pub enabled: bool,
@@ -159,13 +200,41 @@ pub struct Rcon {
     /// Server RCON password.
     pub password: String,
 
-    /// Randomize ingress server RCON password on each start.
+    /// Randomize server RCON password on each start.
     pub randomize_password: bool,
+}
+
+impl Default for Rcon {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            port: 25575,
+            password: "".into(),
+            randomize_password: true,
+        }
+    }
 }
 
 /// Advanced configuration.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct Advanced {
     /// Rewrite server.properties.
     pub rewrite_server_properties: bool,
+}
+
+impl Default for Advanced {
+    fn default() -> Self {
+        Self {
+            rewrite_server_properties: true,
+        }
+    }
+}
+
+fn option_pathbuf_dot() -> Option<PathBuf> {
+    Some(".".into())
+}
+
+fn server_address_default() -> SocketAddr {
+    "127.0.0.1:25566".parse().unwrap()
 }
