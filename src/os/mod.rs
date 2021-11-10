@@ -15,7 +15,7 @@ pub fn force_kill(pid: u32) -> bool {
 
     #[cfg(windows)]
     unsafe {
-        return windodws::force_kill(pid);
+        return windows::force_kill(pid);
     }
 
     unimplemented!("force killing Minecraft server process not implemented on this platform");
