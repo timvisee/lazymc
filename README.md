@@ -4,12 +4,12 @@
 players connect.
 
 Some Minecraft servers (especially modded) use an insane amount of resources
-when nobody is playing. lazymc helps by by stopping your server when idle,
-until a player connects again.
+when nobody is playing. lazymc helps by stopping your server when idle, until a
+player connects again.
 
 lazymc functions as proxy between clients and the server. It handles all
 incoming status connections until the server is started and then transparently
-proxies the rest.
+relays/proxies the rest. All without them noticing.
 
 _Note: this is a prototype and may be incomplete._
 
@@ -26,20 +26,32 @@ https://user-images.githubusercontent.com/856222/140804726-ba1a8e59-85d9-413b-82
 </p>
 </details>
 
+## Features
+
+- Very efficient, lightweight & low-profile (~3KB RAM)
+- Supports Minecraft Java Edition 1.6+, supports modded (e.g. Forge, FTB)
+- Transparent join: hold clients when server starts, relay when ready, without them noticing
+- Customizable MOTD and login messages
+- Automatically manages `server.properties` (host, port and RCON settings)
+- Graceful server sleep/shutdown through RCON (with `SIGTERM` fallback on Linux/Unix)
+- Restart server on crash
+
 ## Requirements
 
-- Linux, macOS, Windows
-- Minecraft Java Edition 1.6 or above
-- On Windows: RCON (automatically managed by default)
+- Linux, macOS or Windows
+- Minecraft Java Edition 1.6+
+- On Windows: RCON (automatically managed)
 
-Using a modded Minecraft server and client (such as Forge) should work fine.
+_Note: You must have access to the system to run the `lazymc` binary. If you're
+using a Minecraft shared hosting provider with a custom dashboard, you likely
+won't be able to set this up._
 
 ## Usage
 
 Make sure you meet all [requirements](#requirements).
 
-_Note: Installation options are limited at this moment. Read-to-go binaries will
-be published later. For now we compile and install from source._
+_Note: Installation options are limited at this moment. Ready-to-go binaries
+will be published later. For now we compile and install from source._
 
 To compile and install you need Rust, install it through `rustup`: https://rustup.rs/
 
