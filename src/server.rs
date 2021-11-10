@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::time::{Duration, Instant};
 
 use futures::FutureExt;
@@ -10,6 +11,9 @@ use crate::config::Config;
 /// Server state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum State {
+    /// Server is stopped.
+    Stopped,
+
     /// Server is starting.
     Starting,
 
@@ -18,16 +22,38 @@ pub enum State {
 
     /// Server is stopping.
     Stopping,
+}
 
-    /// Server is stopped.
-    Stopped,
+impl State {
+    /// From u8, panics if invalid.
+    pub fn from_u8(state: u8) -> Self {
+        match state {
+            0 => Self::Stopped,
+            1 => Self::Starting,
+            2 => Self::Started,
+            3 => Self::Stopping,
+            _ => panic!("invalid State u8"),
+        }
+    }
+
+    /// To u8.
+    pub fn to_u8(self) -> u8 {
+        match self {
+            Self::Stopped => 0,
+            Self::Starting => 1,
+            Self::Started => 2,
+            Self::Stopping => 3,
+        }
+    }
 }
 
 /// Shared server state.
 #[derive(Debug)]
 pub struct Server {
     /// Server state.
-    state: Mutex<State>,
+    ///
+    /// Matches `State`, utilzes AtomicU8 for better performance.
+    state: AtomicU8,
 
     /// Server process PID.
     ///
@@ -37,22 +63,22 @@ pub struct Server {
     /// Last known server status.
     ///
     /// Will remain set once known, not cleared if server goes offline.
-    status: Mutex<Option<ServerStatus>>,
+    status: RwLock<Option<ServerStatus>>,
 
     /// Last active time.
     ///
     /// The last time there was activity on the server. Also set at the moment the server comes
     /// online.
-    last_active: Mutex<Option<Instant>>,
+    last_active: RwLock<Option<Instant>>,
 
     /// Force server to stay online until.
-    keep_online_until: Mutex<Option<Instant>>,
+    keep_online_until: RwLock<Option<Instant>>,
 }
 
 impl Server {
     /// Get current state.
     pub fn state(&self) -> State {
-        *self.state.lock().unwrap()
+        State::from_u8(self.state.load(Ordering::Relaxed))
     }
 
     /// Set a new state.
@@ -69,29 +95,41 @@ impl Server {
     /// This updates various other internal things depending on how the state changes.
     ///
     /// Returns false if current state didn't match `from` or if nothing changed.
-    fn update_state_from(&self, from: Option<State>, state: State, config: &Config) -> bool {
-        // Get current state, must differ from current, must match from
-        let mut cur = self.state.lock().unwrap();
-        if *cur == state || (from.is_some() && from != Some(*cur)) {
+    fn update_state_from(&self, from: Option<State>, new: State, config: &Config) -> bool {
+        // Atomically swap state to new, return if from doesn't match
+        let old = State::from_u8(match from {
+            Some(from) => match self.state.compare_exchange(
+                from.to_u8(),
+                new.to_u8(),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(old) => old,
+                Err(_) => return false,
+            },
+            None => self.state.swap(new.to_u8(), Ordering::Relaxed),
+        });
+
+        // State must be changed
+        if old == new {
             return false;
         }
 
-        trace!("Change server state from {:?} to {:?}", *cur, state);
+        trace!("Change server state from {:?} to {:?}", old, new);
 
         // Online/offline messages
-        match state {
+        match new {
             State::Started => info!(target: "lazymc::monitor", "Server is now online"),
             State::Stopped => info!(target: "lazymc::monitor", "Server is now sleeping"),
             _ => {}
         }
 
         // If Starting -> Started, update active time and keep it online for configured time
-        if *cur == State::Starting && state == State::Started {
+        if old == State::Starting && new == State::Started {
             self.update_last_active();
             self.keep_online_for(Some(config.time.min_online_time));
         }
 
-        *cur = state;
         true
     }
 
@@ -100,10 +138,8 @@ impl Server {
     /// This updates various other internal things depending on the current state and the given
     /// status.
     pub fn update_status(&self, config: &Config, status: Option<ServerStatus>) {
-        let state = *self.state.lock().unwrap();
-
         // Update state based on curren
-        match (state, &status) {
+        match (self.state(), &status) {
             (State::Stopped | State::Starting, Some(_)) => {
                 self.update_state(State::Started, config);
             }
@@ -120,7 +156,7 @@ impl Server {
                 self.update_last_active();
             }
 
-            self.status.lock().unwrap().replace(status);
+            self.status.write().unwrap().replace(status);
         }
     }
 
@@ -175,14 +211,14 @@ impl Server {
     /// Always returns false if it is currently not online.
     pub fn should_sleep(&self, config: &Config) -> bool {
         // Server must be online
-        if *self.state.lock().unwrap() != State::Started {
+        if self.state() != State::Started {
             return false;
         }
 
         // Never sleep if players are online
         let players_online = self
             .status
-            .lock()
+            .read()
             .unwrap()
             .as_ref()
             .map(|status| status.players.online > 0)
@@ -195,7 +231,7 @@ impl Server {
         // Don't sleep when keep online until isn't expired
         let keep_online = self
             .keep_online_until
-            .lock()
+            .read()
             .unwrap()
             .map(|i| i >= Instant::now())
             .unwrap_or(false);
@@ -205,27 +241,26 @@ impl Server {
         }
 
         // Last active time must have passed sleep threshold
-        if let Some(last_idle) = self.last_active.lock().unwrap().as_ref() {
+        if let Some(last_idle) = self.last_active.read().unwrap().as_ref() {
             return last_idle.elapsed() >= Duration::from_secs(config.time.sleep_after as u64);
         }
 
         false
     }
 
-    /// Clone last known server status.
-    // TODO: return mutex guard here
-    pub fn clone_status(&self) -> Option<ServerStatus> {
-        self.status.lock().unwrap().clone()
+    /// Read last known server status.
+    pub fn status(&self) -> RwLockReadGuard<Option<ServerStatus>> {
+        self.status.read().unwrap()
     }
 
     /// Update the last active time.
     fn update_last_active(&self) {
-        self.last_active.lock().unwrap().replace(Instant::now());
+        self.last_active.write().unwrap().replace(Instant::now());
     }
 
     /// Force the server to be online for the given number of seconds.
     fn keep_online_for(&self, duration: Option<u32>) {
-        *self.keep_online_until.lock().unwrap() = duration
+        *self.keep_online_until.write().unwrap() = duration
             .filter(|d| *d > 0)
             .map(|d| Instant::now() + Duration::from_secs(d as u64));
     }
@@ -234,7 +269,7 @@ impl Server {
 impl Default for Server {
     fn default() -> Self {
         Self {
-            state: Mutex::new(State::Stopped),
+            state: AtomicU8::new(State::Stopped.to_u8()),
             pid: Default::default(),
             status: Default::default(),
             last_active: Default::default(),

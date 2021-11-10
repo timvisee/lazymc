@@ -77,8 +77,8 @@ pub async fn serve(
         // Hijack server status packet
         if client_state == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_STATUS {
             // Select version and player max from last known server status
-            let (version, max) = match server.clone_status() {
-                Some(status) => (status.version, status.players.max),
+            let (version, max) = match server.status().as_ref() {
+                Some(status) => (status.version.clone(), status.players.max),
                 None => (
                     ServerVersion {
                         name: config.public.version.clone(),
