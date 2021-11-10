@@ -32,7 +32,7 @@ dotenv = "0.15"
 futures = { version = "0.3", default-features = false }
 libc = "0.2"
 log = "0.4"
-minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "4348c27" }
+minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "31041b8" }
 pretty_env_logger = "0.4"
 serde = "1.0"
 shlex = "1.1"
