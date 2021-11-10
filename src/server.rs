@@ -7,6 +7,7 @@ use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
 
 use crate::config::Config;
+use crate::os;
 
 /// Server state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -73,6 +74,11 @@ pub struct Server {
 
     /// Force server to stay online until.
     keep_online_until: RwLock<Option<Instant>>,
+
+    /// Time to force kill the server process at.
+    ///
+    /// Used as starting/stopping timeout.
+    kill_at: RwLock<Option<Instant>>,
 }
 
 impl Server {
@@ -116,6 +122,17 @@ impl Server {
         }
 
         trace!("Change server state from {:?} to {:?}", old, new);
+
+        // Update kill at time for starting/stopping state
+        *self.kill_at.write().unwrap() = match new {
+            State::Starting if config.advanced.start_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(config.advanced.start_timeout as u64))
+            }
+            State::Stopping if config.advanced.stop_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(config.advanced.stop_timeout as u64))
+            }
+            _ => None,
+        };
 
         // Online/offline messages
         match new {
@@ -206,6 +223,16 @@ impl Server {
         false
     }
 
+    /// Force kill running server.
+    ///
+    /// This requires the server PID to be known.
+    pub async fn force_kill(&self) -> bool {
+        if let Some(pid) = *self.pid.lock().unwrap() {
+            return os::force_kill(pid);
+        }
+        false
+    }
+
     /// Decide whether the server should sleep.
     ///
     /// Always returns false if it is currently not online.
@@ -248,6 +275,15 @@ impl Server {
         false
     }
 
+    /// Decide whether to force kill the server process.
+    pub fn should_kill(&self) -> bool {
+        self.kill_at
+            .read()
+            .unwrap()
+            .map(|t| t <= Instant::now())
+            .unwrap_or(false)
+    }
+
     /// Read last known server status.
     pub fn status(&self) -> RwLockReadGuard<Option<ServerStatus>> {
         self.status.read().unwrap()
@@ -274,6 +310,7 @@ impl Default for Server {
             status: Default::default(),
             last_active: Default::default(),
             keep_online_until: Default::default(),
+            kill_at: Default::default(),
         }
     }
 }

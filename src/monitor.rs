@@ -39,7 +39,6 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
         // Poll server state and update internal status
         trace!(target: "lazymc::monitor", "Fetching status for {} ... ", addr);
         let status = poll_server(&config, &server, addr).await;
-
         match status {
             // Got status, update
             Ok(Some(status)) => server.update_status(&config, Some(status)),
@@ -58,6 +57,14 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
             if !server.stop(&config).await {
                 warn!(target: "lazymc", "Failed to stop server");
+            }
+        }
+
+        // Check whether we should force kill server
+        if server.should_kill() {
+            error!(target: "lazymc::montior", "Force killing server, took too long to start/stop");
+            if !server.force_kill().await {
+                warn!(target: "lazymc", "Failed to force kill server");
             }
         }
 

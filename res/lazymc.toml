@@ -73,3 +73,9 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 [advanced]
 # Automatically update values in Minecraft server.properties file as required.
 #rewrite_server_properties = true
+
+# Server starting timeout. Force kill server process if it takes longer.
+#start_timeout = 300
+
+# Server stopping timeout. Force kill server process if it takes longer.
+#stop_timeout = 150

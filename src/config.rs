@@ -232,12 +232,22 @@ impl Default for Rcon {
 pub struct Advanced {
     /// Rewrite server.properties.
     pub rewrite_server_properties: bool,
+
+    /// Server starting timeout. Force kill server process if it takes longer.
+    #[serde(alias = "starting_timeout")]
+    pub start_timeout: u32,
+
+    /// Server stopping timeout. Force kill server process if it takes longer.
+    #[serde(alias = "stopping_timeout")]
+    pub stop_timeout: u32,
 }
 
 impl Default for Advanced {
     fn default() -> Self {
         Self {
             rewrite_server_properties: true,
+            start_timeout: 300,
+            stop_timeout: 150,
         }
     }
 }
