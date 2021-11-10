@@ -11,7 +11,7 @@ pub unsafe fn force_kill(pid: u32) -> bool {
     debug!(target: "lazymc", "Sending force kill to {} to kill server", pid);
     let handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
     if handle == NULL {
-        warn!(target: "lazymc", "Failed to open process handle in order to kill it", pid);
+        warn!(target: "lazymc", "Failed to open process handle in order to kill it");
         return false;
     }
 
