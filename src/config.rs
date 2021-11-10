@@ -144,6 +144,16 @@ pub struct Time {
     /// Minimum time in seconds to stay online when server is started.
     #[serde(default, alias = "minimum_online_time")]
     pub min_online_time: u32,
+
+    /// Hold client for number of seconds while server starts, instead of kicking immediately.
+    pub hold_client_for: u32,
+}
+
+impl Time {
+    /// Whether to hold clients.
+    pub fn hold(&self) -> bool {
+        self.hold_client_for > 0
+    }
 }
 
 impl Default for Time {
@@ -151,6 +161,7 @@ impl Default for Time {
         Self {
             sleep_after: 60,
             min_online_time: 60,
+            hold_client_for: 25,
         }
     }
 }
