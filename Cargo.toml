@@ -20,7 +20,7 @@ edition = "2021"
 
 [features]
 default = ["rcon"]
-rcon = ["rust_rcon", "rand"]
+rcon = ["rust_rcon"]
 
 [dependencies]
 anyhow = "1.0"
@@ -34,6 +34,7 @@ libc = "0.2"
 log = "0.4"
 minecraft-protocol = { git = "https://github.com/timvisee/minecraft-protocol", rev = "31041b8" }
 pretty_env_logger = "0.4"
+rand = "0.8"
 serde = "1.0"
 shlex = "1.1"
 thiserror = "1.0"
@@ -41,5 +42,4 @@ tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-t
 toml = "0.5"
 
 # Feature: rcon
-rand = { version = "0.8", optional = true }
 rust_rcon = { package = "rcon", version = "0.5", optional = true }
