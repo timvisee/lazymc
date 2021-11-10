@@ -28,7 +28,7 @@ pub fn force_kill(pid: u32) -> bool {
 /// # Panics
 ///
 /// Panics on platforms other than Unix.
-#[allow(unreachable_code)]
+#[allow(unreachable_code, dead_code, unused_variables)]
 pub fn kill_gracefully(pid: u32) -> bool {
     #[cfg(unix)]
     unsafe {

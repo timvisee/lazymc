@@ -62,7 +62,7 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
 
         // Check whether we should force kill server
         if server.should_kill() {
-            error!(target: "lazymc::montior", "Force killing server, took too long to start/stop");
+            error!(target: "lazymc::montior", "Force killing server, took too long to start or stop");
             if !server.force_kill().await {
                 warn!(target: "lazymc", "Failed to force kill server");
             }

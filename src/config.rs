@@ -132,6 +132,10 @@ pub struct Server {
     /// Immediately wake server when starting lazymc.
     #[serde(default)]
     pub wake_on_start: bool,
+
+    /// Immediately wake server after crash.
+    #[serde(default)]
+    pub wake_on_crash: bool,
 }
 
 /// Time configuration.

@@ -348,22 +348,31 @@ pub async fn invoke_server_cmd(
         .replace(child.id().expect("unknown server PID"));
 
     // Wait for process to exit, handle status
-    match child.wait().await {
+    let crashed = match child.wait().await {
         Ok(status) if status.success() => {
             debug!(target: "lazymc", "Server process stopped successfully ({})", status);
+            false
         }
         Ok(status) => {
             warn!(target: "lazymc", "Server process stopped with error code ({})", status);
+            state.state() == State::Started
         }
         Err(err) => {
             error!(target: "lazymc", "Failed to wait for server process to quit: {}", err);
             error!(target: "lazymc", "Assuming server quit, cleaning up...");
+            false
         }
-    }
+    };
 
     // Set state to stopped, update server PID
     state.pid.lock().unwrap().take();
     state.update_state(State::Stopped, &config);
+
+    // Restart on crash
+    if crashed && config.server.wake_on_crash {
+        warn!(target: "lazymc", "Server crashed, restarting...");
+        Server::start(config, state, None);
+    }
 
     Ok(())
 }
