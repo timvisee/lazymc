@@ -71,7 +71,7 @@ fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
 fn route_status(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
     // When server is not online, spawn a status server
     let client = Client::default();
-    let service = status::serve(client, inbound, config.clone(), server.clone()).map(|r| {
+    let service = status::serve(client, inbound, config, server).map(|r| {
         if let Err(err) = r {
             warn!(target: "lazymc", "Failed to serve status: {:?}", err);
         }
@@ -95,7 +95,7 @@ fn route_proxy(inbound: TcpStream, config: Arc<Config>) {
 
 /// Route inbound TCP stream to proxy with queued data, spawning a new task.
 #[inline]
-pub fn route_proxy_queue<'a>(inbound: TcpStream, config: Arc<Config>, queue: BytesMut) {
+pub fn route_proxy_queue(inbound: TcpStream, config: Arc<Config>, queue: BytesMut) {
     // When server is online, proxy all
     let service = async move {
         proxy::proxy_with_queue(inbound, config.server.address, &queue)

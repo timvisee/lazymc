@@ -53,17 +53,17 @@ fn init_log() {
 }
 
 /// Invoke an action.
-fn invoke_action<'a>(app: App<'a>) -> Result<(), ()> {
+fn invoke_action(app: App) -> Result<(), ()> {
     let matches = app.get_matches();
 
     // Config operations
-    if let Some(ref matches) = matches.subcommand_matches("config") {
-        if let Some(ref matches) = matches.subcommand_matches("generate") {
+    if let Some(matches) = matches.subcommand_matches("config") {
+        if let Some(matches) = matches.subcommand_matches("generate") {
             action::config_generate::invoke(matches);
             return Ok(());
         }
 
-        if let Some(ref matches) = matches.subcommand_matches("test") {
+        if let Some(matches) = matches.subcommand_matches("test") {
             action::config_test::invoke(matches);
             return Ok(());
         }

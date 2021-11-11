@@ -30,11 +30,7 @@ pub fn print_error(err: anyhow::Error) {
 
     // Fall back to a basic message
     if count == 0 {
-        eprintln!(
-            "{} {}",
-            highlight_error("error:"),
-            "an undefined error occurred"
-        );
+        eprintln!("{} an undefined error occurred", highlight_error("error:"),);
     }
 }
 
@@ -123,7 +119,7 @@ impl ErrorHints {
             return;
         }
 
-        eprint!("\n");
+        eprintln!();
 
         // Print hints
         let bin = crate::util::bin_name();

@@ -133,7 +133,7 @@ impl RawPacket {
         let mut packet = types::encode_var_int(len)?;
         packet.append(&mut data);
 
-        return Ok(packet);
+        Ok(packet)
     }
 }
 
@@ -142,9 +142,9 @@ impl RawPacket {
 /// Note: this does not support reading compressed/encrypted packets.
 /// We should never need this though, as we're done reading user packets before any of this is
 /// enabled. See: https://wiki.vg/Protocol#Packet_format
-pub async fn read_packet<'a>(
+pub async fn read_packet(
     buf: &mut BytesMut,
-    stream: &mut ReadHalf<'a>,
+    stream: &mut ReadHalf<'_>,
 ) -> Result<Option<(RawPacket, Vec<u8>)>, ()> {
     // Keep reading until we have at least 2 bytes
     while buf.len() < 2 {
@@ -166,7 +166,7 @@ pub async fn read_packet<'a>(
     }
 
     // Attempt to read packet length
-    let (consumed, len) = match types::read_var_int(&buf) {
+    let (consumed, len) = match types::read_var_int(buf) {
         Ok(result) => result,
         Err(err) => {
             error!(target: "lazymc", "Malformed packet, could not read packet length");

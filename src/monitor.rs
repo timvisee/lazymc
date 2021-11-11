@@ -98,7 +98,7 @@ pub async fn poll_server(
 async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus, ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
-    send_handshake(&mut stream, &config, addr).await?;
+    send_handshake(&mut stream, config, addr).await?;
     request_status(&mut stream).await?;
     wait_for_status_timeout(&mut stream).await
 }
@@ -107,7 +107,7 @@ async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus,
 async fn do_ping(config: &Config, addr: SocketAddr) -> Result<(), ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
-    send_handshake(&mut stream, &config, addr).await?;
+    send_handshake(&mut stream, config, addr).await?;
     let token = send_ping(&mut stream).await?;
     wait_for_ping_timeout(&mut stream, token).await
 }

@@ -11,7 +11,7 @@ pub fn read_var_int(buf: &[u8]) -> Result<(usize, i32), ()> {
         let buf = &buf[..len];
 
         // Parse var-int, return result
-        return match minecraft_protocol::decoder::var_int::decode(&mut buf.as_ref()) {
+        return match minecraft_protocol::decoder::var_int::decode(&mut &*buf) {
             Ok(val) => Ok((len, val)),
             Err(_) => Err(()),
         };

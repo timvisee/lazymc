@@ -217,7 +217,7 @@ pub async fn hold<'a>(
 /// Kick client with a message.
 ///
 /// Should close connection afterwards.
-async fn kick<'a>(msg: &str, writer: &mut WriteHalf<'a>) -> Result<(), ()> {
+async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     let packet = LoginDisconnect {
         reason: Message::new(Payload::text(msg)),
     };

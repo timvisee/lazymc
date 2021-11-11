@@ -15,16 +15,16 @@ pub fn invoke(matches: &ArgMatches) {
     }
 
     // Confirm to overwrite if it exists
-    if path.is_file() {
-        if !prompt_yes(
+    if path.is_file()
+        && !prompt_yes(
             &format!(
                 "Config file already exists, overwrite?\nPath: {}",
                 path.to_str().unwrap_or("?")
             ),
             Some(true),
-        ) {
-            quit();
-        }
+        )
+    {
+        quit();
     }
 
     // Generate file

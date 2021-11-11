@@ -29,7 +29,7 @@ pub async fn proxy_with_queue(
     if !queue.is_empty() {
         wo.writable().await?;
         trace!(target: "lazymc", "Relaying {} queued bytes to server", queue.len());
-        wo.write_all(&queue).await?;
+        wo.write_all(queue).await?;
     }
 
     let client_to_server = async {

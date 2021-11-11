@@ -210,13 +210,13 @@ impl Server {
 
         // Try to stop through RCON if started
         #[cfg(feature = "rcon")]
-        if self.state() == State::Started && stop_server_rcon(config, &self).await {
+        if self.state() == State::Started && stop_server_rcon(config, self).await {
             return true;
         }
 
         // Try to stop through signal
         #[cfg(unix)]
-        if stop_server_signal(config, &self) {
+        if stop_server_signal(config, self) {
             return true;
         }
 
@@ -388,7 +388,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
     }
 
     // RCON address
-    let mut addr = config.server.address.clone();
+    let mut addr = config.server.address;
     addr.set_port(config.rcon.port);
     let addr = addr.to_string();
 

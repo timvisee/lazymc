@@ -87,7 +87,6 @@ pub fn rewrite_file(file: &Path, changes: HashMap<&str, String>) {
                 FILE,
                 err,
             );
-            return;
         }
     };
 }
@@ -110,7 +109,7 @@ fn rewrite_contents(contents: String, mut changes: HashMap<&str, String>) -> Opt
 
             // Skip comments or empty lines
             let trim = line.trim();
-            if trim.starts_with("#") || trim.is_empty() {
+            if trim.starts_with('#') || trim.is_empty() {
                 return line;
             }
 
