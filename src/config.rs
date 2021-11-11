@@ -151,6 +151,14 @@ pub struct Time {
 
     /// Hold client for number of seconds while server starts, instead of kicking immediately.
     pub hold_client_for: u32,
+
+    /// Server starting timeout. Force kill server process if it takes longer.
+    #[serde(alias = "starting_timeout")]
+    pub start_timeout: u32,
+
+    /// Server stopping timeout. Force kill server process if it takes longer.
+    #[serde(alias = "stopping_timeout")]
+    pub stop_timeout: u32,
 }
 
 impl Time {
@@ -166,6 +174,8 @@ impl Default for Time {
             sleep_after: 60,
             min_online_time: 60,
             hold_client_for: 25,
+            start_timeout: 300,
+            stop_timeout: 150,
         }
     }
 }
@@ -236,22 +246,12 @@ impl Default for Rcon {
 pub struct Advanced {
     /// Rewrite server.properties.
     pub rewrite_server_properties: bool,
-
-    /// Server starting timeout. Force kill server process if it takes longer.
-    #[serde(alias = "starting_timeout")]
-    pub start_timeout: u32,
-
-    /// Server stopping timeout. Force kill server process if it takes longer.
-    #[serde(alias = "stopping_timeout")]
-    pub stop_timeout: u32,
 }
 
 impl Default for Advanced {
     fn default() -> Self {
         Self {
             rewrite_server_properties: true,
-            start_timeout: 300,
-            stop_timeout: 150,
         }
     }
 }
