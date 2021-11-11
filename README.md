@@ -1,3 +1,10 @@
+[![Build status on GitLab CI][gitlab-ci-master-badge]][gitlab-ci-link]
+[![Project license][license-badge]](LICENSE)
+
+[gitlab-ci-link]: https://gitlab.com/timvisee/lazymc/pipelines
+[gitlab-ci-master-badge]: https://gitlab.com/timvisee/lazymc/badges/master/pipeline.svg
+[license-badge]: https://img.shields.io/github/license/timvisee/lazymc
+
 # lazymc
 
 `lazymc` puts your Minecraft server to rest when idle, and wakes it up when
