@@ -18,8 +18,6 @@ lazymc functions as proxy between clients and the server. It handles all
 incoming status connections until the server is started and then transparently
 relays/proxies the rest. All without them noticing.
 
-_Note: this is a prototype and may be incomplete._
-
 https://user-images.githubusercontent.com/856222/141307395-c6252332-7fdb-4443-b9ae-1021a03f9650.mp4
 
 
@@ -57,28 +55,27 @@ won't be able to set this up._
 
 ## Usage
 
+_Note: these instructions are for Linux & macOS, for Windows look
+[here](./docs/usage-windows.md)._
+
 Make sure you meet all [requirements](#requirements).
 
-_Note: Installation options are limited at this moment. Ready-to-go binaries
-will be published later. For now we compile and install from source._
+Download the appropriate binary for your system from the [latest
+release][latest-release] page.
 
-To compile and install you need Rust, install it through `rustup`: https://rustup.rs/
-
-When Rust is installed, compile and install `lazymc` from this git repository:
+Place the binary in your Minecraft server directory, rename it if you like.
+Open a terminal, go to the directory, and make sure you can invoke it:
 
 ```bash
-# Compile and install lazymc from source
-cargo install -f --git https://github.com/timvisee/lazymc
-
-# Ensure lazymc works
-lazymc --help
+chmod a+x ./lazymc
+./lazymc --help
 ```
 
-When `lazymc` is available, change into your server directory. Then set up the
-[configuration](./res/lazymc.toml) and start it up:
+When `lazymc` is set-up, change into your server directory if you haven't
+already. Then set up the [configuration](./res/lazymc.toml) and start it up:
 
 ```bash
-# Change into your server directory
+# Change into your server directory (if you haven't already)
 cd server
 
 # Generate lazymc configuration
@@ -94,6 +91,45 @@ lazymc start
 
 Everything should now be running. Connect with your Minecraft client to wake
 your server up!
+
+_Note: If a binary for your system isn't provided, please [compile from
+source](#compile-from-source)._
+
+_Note: Installation options are limited at this moment. More will be added
+later._
+
+[latest-release]: https://github.com/timvisee/lazymc/releases/latest
+
+## Compile from source
+
+Make sure you meet all [requirements](#requirements).
+
+To compile from source you need Rust, install it through `rustup`: https://rustup.rs/
+
+When Rust is installed, compile and install `lazymc` from this git repository
+directly:
+
+```bash
+# Compile and install lazymc from source
+cargo install -f --git https://github.com/timvisee/lazymc
+
+# Ensure lazymc works
+lazymc --help
+```
+
+Or clone the repository and build it yourself:
+
+```bash
+# Clone repository
+git clone https://github.com/timvisee/lazymc
+cd lazymc
+
+# Compile
+cargo build --release
+
+# Run lazymc
+./target/release/lazymc --help
+```
 
 ## License
 
