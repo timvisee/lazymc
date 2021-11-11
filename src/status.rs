@@ -55,11 +55,17 @@ pub async fn serve(
         if client_state == ClientState::Handshake && packet.id == proto::STATUS_PACKET_ID_STATUS {
             // Parse handshake, grab new state
             let new_state = match Handshake::decode(&mut packet.data.as_slice()) {
-                Ok(handshake) => {
-                    // TODO: do not panic here
-                    ClientState::from_id(handshake.next_state).expect("unknown next client state")
+                Ok(handshake) => match ClientState::from_id(handshake.next_state) {
+                    Some(state) => state,
+                    None => {
+                        error!(target: "lazymc", "Client tried to switch into unknown protcol state ({}), disconnecting", handshake.next_state);
+                        break;
+                    }
+                },
+                Err(_) => {
+                    debug!(target: "lazymc", "Got malformed handshake from client, disconnecting");
+                    break;
                 }
-                Err(_) => break,
             };
 
             // Update client state
@@ -159,7 +165,7 @@ pub async fn hold<'a>(
     let timeout = config.time.hold_client_for as u64;
 
     loop {
-        // TODO: do not poll, wait for started signal instead (with timeout)
+        // TODO: wait for start signal over channel instead of polling
         poll_interval.tick().await;
 
         trace!("Polling server state for holding client...");

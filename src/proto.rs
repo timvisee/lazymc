@@ -31,7 +31,9 @@ pub const STATUS_PACKET_ID_PING: i32 = 1;
 pub const LOGIN_PACKET_ID_LOGIN_START: i32 = 0;
 
 /// Client state.
-// TODO: add encryption/compression state?
+///
+/// Note: this does not keep track of compression/encryption states because packets are never
+/// inspected when these modes are enabled.
 #[derive(Debug, Default)]
 pub struct Client {
     /// Current client state.
@@ -50,6 +52,10 @@ impl Client {
     }
 }
 
+/// Protocol state a client may be in.
+///
+/// Note: this does not include the `play` state, because this is never used anymore when a client
+/// reaches this state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ClientState {
     /// Initial client state.
@@ -60,9 +66,6 @@ pub enum ClientState {
 
     /// State to login to server.
     Login,
-
-    /// State for playing.
-    Play,
 }
 
 impl ClientState {
@@ -72,7 +75,6 @@ impl ClientState {
             0 => Some(Self::Handshake),
             1 => Some(Self::Status),
             2 => Some(Self::Login),
-            3 => Some(Self::Play),
             _ => None,
         }
     }
@@ -83,7 +85,6 @@ impl ClientState {
             Self::Handshake => 0,
             Self::Status => 1,
             Self::Login => 2,
-            Self::Play => 3,
         }
     }
 }

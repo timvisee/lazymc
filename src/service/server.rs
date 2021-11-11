@@ -23,7 +23,6 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     let server = Arc::new(Server::default());
 
     // Listen for new connections
-    // TODO: do not drop error here
     let listener = TcpListener::bind(config.public.address)
         .await
         .map_err(|err| {

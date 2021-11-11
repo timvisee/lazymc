@@ -25,7 +25,6 @@ pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
     rewrite_server_properties(&config);
 
     // Start server service
-    // TODO: start tokio runtime here?
     let config = Arc::new(config);
     service::server::service(config)
 }
