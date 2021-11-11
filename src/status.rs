@@ -1,10 +1,8 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::proxy;
 use crate::server::State;
 use bytes::BytesMut;
-use futures::TryFutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
@@ -20,6 +18,7 @@ use tokio::time;
 use crate::config::*;
 use crate::proto::{self, Client, ClientState, RawPacket};
 use crate::server::{self, Server};
+use crate::service;
 
 /// Client holding server state poll interval.
 const HOLD_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -111,7 +110,7 @@ pub async fn serve(
                 hold_queue.extend(buf.split_off(0));
 
                 // Start holding
-                hold(inbound, config, server, &mut hold_queue).await?;
+                hold(inbound, config, server, hold_queue).await?;
                 return Ok(());
             }
 
@@ -150,7 +149,7 @@ pub async fn hold<'a>(
     mut inbound: TcpStream,
     config: Arc<Config>,
     server: Arc<Server>,
-    holding: &mut BytesMut,
+    hold_queue: BytesMut,
 ) -> Result<(), ()> {
     trace!(target: "lazymc", "Started holding client");
 
@@ -186,9 +185,7 @@ pub async fn hold<'a>(
 
                 // Relay client to proxy
                 info!(target: "lazymc", "Server ready for held client, relaying to server");
-                proxy::proxy_with_queue(inbound, config.server.address, &holding)
-                    .map_err(|_| ())
-                    .await?;
+                service::server::route_proxy_queue(inbound, config, hold_queue);
                 return Ok(());
             }
 
