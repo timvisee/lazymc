@@ -76,35 +76,7 @@ pub async fn serve(
 
         // Hijack server status packet
         if client_state == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_STATUS {
-            // Select version and player max from last known server status
-            let (version, max) = match server.status().as_ref() {
-                Some(status) => (status.version.clone(), status.players.max),
-                None => (
-                    ServerVersion {
-                        name: config.public.version.clone(),
-                        protocol: config.public.protocol,
-                    },
-                    0,
-                ),
-            };
-
-            // Select description
-            let description = match server.state() {
-                server::State::Stopped | server::State::Started => &config.messages.motd_sleeping,
-                server::State::Starting => &config.messages.motd_starting,
-                server::State::Stopping => &config.messages.motd_stopping,
-            };
-
-            // Build status resposne
-            let server_status = ServerStatus {
-                version,
-                description: Message::new(Payload::text(description)),
-                players: OnlinePlayers {
-                    online: 0,
-                    max,
-                    sample: vec![],
-                },
-            };
+            let server_status = server_status(&config, &server);
             let packet = StatusResponse { server_status };
 
             let mut data = Vec::new();
@@ -258,4 +230,45 @@ async fn kick<'a>(msg: &str, writer: &mut WriteHalf<'a>) -> Result<(), ()> {
 
     let response = RawPacket::new(0, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())
+}
+
+/// Build server status object to respond to client with.
+fn server_status(config: &Config, server: &Server) -> ServerStatus {
+    let status = server.status();
+
+    // Select version and player max from last known server status
+    let (version, max) = match status.as_ref() {
+        Some(status) => (status.version.clone(), status.players.max),
+        None => (
+            ServerVersion {
+                name: config.public.version.clone(),
+                protocol: config.public.protocol,
+            },
+            0,
+        ),
+    };
+
+    // Select description, use server MOTD if enabled, or use configured
+    let description = {
+        if config.messages.use_server_motd && status.is_some() {
+            status.as_ref().unwrap().description.clone()
+        } else {
+            Message::new(Payload::text(match server.state() {
+                server::State::Stopped | server::State::Started => &config.messages.motd_sleeping,
+                server::State::Starting => &config.messages.motd_starting,
+                server::State::Stopping => &config.messages.motd_stopping,
+            }))
+        }
+    };
+
+    // Build status resposne
+    ServerStatus {
+        version,
+        description,
+        players: OnlinePlayers {
+            online: 0,
+            max,
+            sample: vec![],
+        },
+    }
 }

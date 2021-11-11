@@ -60,6 +60,9 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 #motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
 #motd_stopping = "☠ Server going to sleep...\n⌛ Please wait..."
 
+# Use MOTD from Minecraft server once known.
+#use_server_motd = false
+
 # Login messages, when user tries to connect.
 #login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
 #login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."

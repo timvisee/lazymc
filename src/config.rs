@@ -193,6 +193,9 @@ pub struct Messages {
     /// MOTD when server is stopping.
     pub motd_stopping: String,
 
+    /// Use MOTD from Minecraft server once known.
+    pub use_server_motd: bool,
+
     /// Login message when server is starting.
     pub login_starting: String,
 
@@ -206,6 +209,7 @@ impl Default for Messages {
             motd_sleeping: "☠ Server is sleeping\n§2☻ Join to start it up".into(),
             motd_starting: "§2☻ Server is starting...\n§7⌛ Please wait...".into(),
             motd_stopping: "☠ Server going to sleep...\n⌛ Please wait...".into(),
+            use_server_motd: false,
             login_starting: "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.".into(),
             login_stopping: "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again.".into(),
         }
