@@ -1,0 +1,257 @@
+image: "rust:slim"
+
+stages:
+  - check
+  - build
+  - test
+  - pre-release
+  - release
+
+# Variable defaults
+variables:
+  TARGET: x86_64-unknown-linux-gnu
+
+# Rust build cache configuration
+.rust-build-cache: &rust-build-cache
+  key: "$CI_PIPELINE_ID"
+  paths:
+    - target/
+
+# Install build dependencies
+before_script:
+  - apt-get update
+  - apt-get install -y --no-install-recommends build-essential
+  - |
+    rustc --version
+    cargo --version
+
+# Windows before script
+.before_script-windows: &before_script-windows
+  before_script:
+    # Install scoop
+    - Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+
+    # Install Rust
+    - scoop install rustup
+    - rustc --version
+    - cargo --version
+
+# Check on stable, beta and nightly 
+.check-base: &check-base
+  stage: check
+  cache:
+    <<: *rust-build-cache
+  script:
+    - cargo check --verbose
+    - cargo check --no-default-features --features rcon --verbose
+check:
+  <<: *check-base
+check-macos:
+  tags:
+    - macos
+  only:
+    - master
+    - /^v(\d+\.)*\d+$/
+  before_script:
+    - rustup default stable
+    - |
+      rustc --version
+      cargo --version
+  <<: *check-base
+check-windows:
+  stage: check
+  tags:
+    - windows
+  cache: {}
+  <<: *before_script-windows
+  script:
+    - cargo check --locked --verbose
+    - cargo check --locked --no-default-features --features rcon --verbose
+
+# Build using Rust stable on Linux
+build-x86_64-linux-gnu:
+  stage: build
+  needs: []
+  cache:
+    <<: *rust-build-cache
+  script:
+    - cargo build --target=$TARGET --release --locked --verbose
+    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
+    - strip -g ./lazymc-$TARGET
+  artifacts:
+    name: lazymc-x86_64-linux-gnu
+    paths:
+      - lazymc-$TARGET
+    expire_in: 1 month
+
+# Build a static version
+build-x86_64-linux-musl:
+  stage: build
+  needs: []
+  variables:
+    TARGET: x86_64-unknown-linux-musl
+  cache:
+    <<: *rust-build-cache
+  script:
+    - rustup target add $TARGET
+    - cargo build --target=$TARGET --release --locked --verbose
+
+    # Prepare the release artifact, strip it
+    - find . -name lazymc -exec ls -lah {} \;
+    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
+    - strip -g ./lazymc-$TARGET
+  artifacts:
+    name: lazymc-x86_64-linux-musl
+    paths:
+      - lazymc-$TARGET
+    expire_in: 1 month
+
+# Build using Rust stable on macOS
+build-macos:
+  stage: build
+  tags:
+    - macos
+  only:
+    - master
+    - /^v(\d+\.)*\d+$/
+  needs: []
+  variables:
+    TARGET: x86_64-apple-darwin
+  before_script:
+    - rustup default stable
+    - |
+      rustc --version
+      cargo --version
+  script:
+    - cargo build --target=$TARGET --release --locked --verbose
+    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
+  artifacts:
+    name: lazymc-x86_64-macos
+    paths:
+      - lazymc-$TARGET
+    expire_in: 1 month
+
+# Build using Rust stable on Windows
+build-x86_64-windows:
+  stage: build
+  tags:
+    - windows
+  needs: []
+  variables:
+    TARGET: x86_64-pc-windows-msvc
+  <<: *before_script-windows
+  script:
+    - cargo build --target=$TARGET --release --locked --verbose
+    - mv target\$env:TARGET\release\lazymc.exe .\lazymc-$env:TARGET.exe
+  artifacts:
+    name: lazymc-x86_64-windows
+    paths:
+      - lazymc-$TARGET.exe
+    expire_in: 1 month
+
+# Run the unit tests through Cargo on Linux
+test-cargo-x86_64-linux-gnu:
+  stage: test
+  needs: []
+  dependencies: []
+  cache:
+    <<: *rust-build-cache
+  script:
+    - cargo test --locked --verbose
+
+# Run the unit tests through Cargo on Windows
+test-cargo-x86_64-windows:
+  stage: test
+  tags:
+    - windows
+  needs: []
+  dependencies: []
+  cache: {}
+  <<: *before_script-windows
+  script:
+    - cargo test --locked --verbose
+
+# Release binaries on GitLab as generic package
+release-gitlab-generic-package:
+  image: curlimages/curl
+  stage: pre-release
+  dependencies:
+    - build-x86_64-linux-gnu
+    - build-x86_64-linux-musl
+    - build-macos
+    - build-x86_64-windows
+  only:
+    - /^v(\d+\.)*\d+$/
+  variables:
+    LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
+    LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
+    MACOS_BIN: "lazymc-x86_64-apple-darwin"
+    WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
+  before_script: []
+  script:
+    # Get version based on tag, determine registry URL
+    - VERSION=$(echo $CI_COMMIT_REF_NAME | cut -c 2-)
+    - PACKAGE_REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/lazymc/${VERSION}"
+
+    # Publish packages
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_GNU_BIN} ${PACKAGE_REGISTRY_URL}/${LINUX_GNU_BIN}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_MUSL_BIN} ${PACKAGE_REGISTRY_URL}/${LINUX_MUSL_BIN}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${MACOS_BIN} ${PACKAGE_REGISTRY_URL}/${MACOS_BIN}
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${WINDOWS_BIN} ${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}
+
+# Publish GitLab release
+release-gitlab-release:
+  image: registry.gitlab.com/gitlab-org/release-cli
+  stage: release
+  only:
+    - /^v(\d+\.)*\d+$/
+  variables:
+    LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
+    LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
+    MACOS_BIN: "lazymc-x86_64-apple-darwin"
+    WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
+  before_script: []
+  script:
+    # Get version based on tag, determine registry URL
+    - VERSION=$(echo $CI_COMMIT_REF_NAME | cut -c 2-)
+    - PACKAGE_REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/lazymc/${VERSION}"
+
+    # Publish release
+    - |
+      release-cli create --name "lazymc $CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+        --assets-link "{\"name\":\"${LINUX_GNU_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_GNU_BIN}\"}" \
+        --assets-link "{\"name\":\"${LINUX_MUSL_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_MUSL_BIN}\"}" \
+        --assets-link "{\"name\":\"${MACOS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${MACOS_BIN}\"}" \
+        --assets-link "{\"name\":\"${WINDOWS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}\"}"
+
+# Publish GitHub release
+release-github:
+  stage: release
+  only:
+    - /^v(\d+\.)*\d+$/
+  dependencies:
+    - build-x86_64-linux-gnu
+    - build-x86_64-linux-musl
+    - build-macos
+    - build-x86_64-windows
+  before_script: []
+  script:
+    # Install dependencies
+    - apt-get update
+    - apt-get install -y curl wget gzip netbase
+
+    # Download github-release binary
+    - wget https://github.com/tfausak/github-release/releases/download/1.2.5/github-release-linux.gz -O github-release.gz
+    - gunzip github-release.gz
+    - chmod a+x ./github-release
+
+    # Create the release, upload binaries
+    - ./github-release release --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --title "lazymc $CI_COMMIT_REF_NAME"
+    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-unknown-linux-gnu --name lazymc-$CI_COMMIT_REF_NAME-linux-x64
+    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-unknown-linux-musl --name lazymc-$CI_COMMIT_REF_NAME-linux-x64-static
+    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-apple-darwin --name lazymc-$CI_COMMIT_REF_NAME-macos
+    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-pc-windows-msvc.exe --name lazymc-$CI_COMMIT_REF_NAME-windows.exe
