@@ -29,14 +29,13 @@ use clap::App;
 const LOG_DEFAULT: &str = "info";
 
 /// Main entrypoint.
-#[tokio::main]
-async fn main() -> Result<(), ()> {
+fn main() -> Result<(), ()> {
     // Initialize logger
     init_log();
 
     // Build clap app, invoke intended action
     let app = cli::app();
-    invoke_action(app).await
+    invoke_action(app)
 }
 
 /// Initialize logger.
@@ -54,7 +53,7 @@ fn init_log() {
 }
 
 /// Invoke an action.
-async fn invoke_action<'a>(app: App<'a>) -> Result<(), ()> {
+fn invoke_action<'a>(app: App<'a>) -> Result<(), ()> {
     let matches = app.get_matches();
 
     // Config operations
@@ -69,9 +68,9 @@ async fn invoke_action<'a>(app: App<'a>) -> Result<(), ()> {
             return Ok(());
         }
 
-        unimplemented!("Config logic here!");
+        unreachable!();
     }
 
     // Start server
-    action::start::invoke(&matches).await
+    action::start::invoke(&matches)
 }

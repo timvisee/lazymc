@@ -12,7 +12,7 @@ use crate::service;
 const RCON_PASSWORD_LENGTH: usize = 32;
 
 /// Start lazymc.
-pub async fn invoke(matches: &ArgMatches) -> Result<(), ()> {
+pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
     // Load config
     #[allow(unused_mut)]
     let mut config = config::load(matches);
@@ -27,7 +27,7 @@ pub async fn invoke(matches: &ArgMatches) -> Result<(), ()> {
     // Start server service
     // TODO: start tokio runtime here?
     let config = Arc::new(config);
-    service::server::service(config).await
+    service::server::service(config)
 }
 
 /// Prepare RCON.

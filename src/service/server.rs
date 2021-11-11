@@ -13,6 +13,11 @@ use crate::status;
 use crate::util::error::{quit_error, ErrorHints};
 
 /// Start lazymc.
+///
+/// Main entrypoint to start all server/status/proxy logic.
+///
+/// Spawns a tokio runtime to complete all work on.
+#[tokio::main(flavor = "multi_thread")]
 pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     // Load server state
     let server = Arc::new(Server::default());
