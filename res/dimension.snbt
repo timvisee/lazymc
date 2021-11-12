@@ -1,0 +1,18 @@
+{
+    piglin_safe: 1b,
+    natural: 0b,
+    ambient_light: 0.0f,
+    fixed_time: 0,
+    infiniburn: "minecraft:infiniburn_overworld",
+    respawn_anchor_works: 0b,
+    has_skylight: 1b,
+    bed_works: 0b,
+    effects: "minecraft:the_end",
+    has_raids: 0b,
+    min_y: 0,
+    height: 256,
+    logical_height: 256,
+    coordinate_scale: 1.0d,
+    ultrawarm: 0b,
+    has_ceiling: 0b
+}

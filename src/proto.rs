@@ -30,6 +30,31 @@ pub const STATUS_PACKET_ID_PING: i32 = 1;
 /// Login state, login start packet ID.
 pub const LOGIN_PACKET_ID_LOGIN_START: i32 = 0;
 
+/// Login state, disconnect packet ID.
+pub const LOGIN_PACKET_ID_DISCONNECT: i32 = 0;
+
+/// Login state, login success packet ID.
+pub const LOGIN_PACKET_ID_LOGIN_SUCCESS: i32 = 2;
+
+pub mod packets {
+    pub mod play {
+        pub const CLIENT_JOIN_GAME: i32 = 0x26;
+        pub const SERVER_CLIENT_SETTINGS: i32 = 0x05;
+        pub const SERVER_PLUGIN_MESSAGE: i32 = 0x0A;
+        pub const SERVER_PLAYER_POS_ROT: i32 = 0x12;
+        pub const SERVER_PLAYER_POS: i32 = 0x11;
+        pub const CLIENT_KEEP_ALIVE: i32 = 0x21;
+        pub const CLIENT_CHUNK_DATA: i32 = 0x22;
+        pub const CLIENT_PLAYER_POS_LOOK: i32 = 0x38;
+        pub const CLIENT_SET_TITLE_TEXT: i32 = 0x59;
+        pub const CLIENT_SET_TITLE_SUBTITLE: i32 = 0x57;
+        pub const CLIENT_SET_TITLE_TIMES: i32 = 0x5A;
+        pub const CLIENT_TIME_UPDATE: i32 = 0x58;
+        pub const CLIENT_CHAT_MSG: i32 = 0x0F;
+        pub const CLIENT_SPAWN_POS: i32 = 0x4B;
+    }
+}
+
 /// Client state.
 ///
 /// Note: this does not keep track of compression/encryption states because packets are never
@@ -66,6 +91,9 @@ pub enum ClientState {
 
     /// State to login to server.
     Login,
+
+    /// State to play on the server.
+    Play,
 }
 
 impl ClientState {
@@ -85,6 +113,7 @@ impl ClientState {
             Self::Handshake => 0,
             Self::Status => 1,
             Self::Login => 2,
+            Self::Play => -1,
         }
     }
 }

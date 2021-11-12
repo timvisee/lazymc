@@ -31,7 +31,7 @@ derive_builder = "0.10"
 dotenv = "0.15"
 futures = { version = "0.3", default-features = false }
 log = "0.4"
-minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "31041b8" }
+minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", branch = "lazymc-v1_17_1" }
 pretty_env_logger = "0.4"
 rand = "0.8"
 serde = "1.0"
@@ -43,6 +43,11 @@ version-compare = "0.1"
 
 # Feature: rcon
 rust_rcon = { package = "rcon", version = "0.5", optional = true }
+
+# Feature: lobby
+named-binary-tag = "0.6"
+quartz_nbt = "0.2"
+uuid = { version = "0.7", features = ["v3"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

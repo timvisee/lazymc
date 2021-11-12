@@ -214,6 +214,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22a9137b95ea06864e018375b72adfb7db6e6f68cfc8df5a04d00288050485ee"
 
 [[package]]
+name = "cesu8"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -626,7 +632,9 @@ dependencies = [
  "libc",
  "log",
  "minecraft-protocol",
+ "named-binary-tag",
  "pretty_env_logger",
+ "quartz_nbt",
  "rand 0.8.4",
  "rcon",
  "serde",
@@ -634,6 +642,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "toml",
+ "uuid",
  "version-compare",
  "winapi",
 ]
@@ -661,6 +670,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "md5"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e6bcd6433cff03a4bfc3d9834d504467db1f1cf6d0ea765d37d330249ed629d"
+
+[[package]]
 name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -669,7 +684,7 @@ checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 [[package]]
 name = "minecraft-protocol"
 version = "0.1.0"
-source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=31041b8#31041b8fe2bc7e512d12476b958c1fe9e9077394"
+source = "git+https://github.com/timvisee/rust-minecraft-protocol?branch=lazymc-v1_17_1#d26a525c7b29b61d2db64805181fb5471ea4317a"
 dependencies = [
  "byteorder",
  "minecraft-protocol-derive",
@@ -682,7 +697,7 @@ dependencies = [
 [[package]]
 name = "minecraft-protocol-derive"
 version = "0.0.0"
-source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=31041b8#31041b8fe2bc7e512d12476b958c1fe9e9077394"
+source = "git+https://github.com/timvisee/rust-minecraft-protocol?branch=lazymc-v1_17_1#d26a525c7b29b61d2db64805181fb5471ea4317a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -723,9 +738,9 @@ dependencies = [
 
 [[package]]
 name = "named-binary-tag"
-version = "0.2.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d654702943d37d67f1491769ed46484c306f9b9d0d258348904bd63ffb101e8"
+checksum = "523298fac63bd954f9a2e03b962b8a4a0e95110ad1b2fa3e0d7048660ffecec3"
 dependencies = [
  "byteorder",
  "flate2",
@@ -844,6 +859,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "quartz_nbt"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24532990479062a9c515987986225879bd115ccb97672b1fb56d788a5adb7d39"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "cesu8",
+ "flate2",
+ "quartz_nbt_macros",
+]
+
+[[package]]
+name = "quartz_nbt_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "289baa0c8a4d1f840d2de528a7f8c29e0e9af48b3018172b3edad4f716e8daed"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1251,6 +1290,7 @@ version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
 dependencies = [
+ "md5",
  "rand 0.6.5",
  "serde",
 ]

@@ -2,7 +2,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::server::State;
 use bytes::BytesMut;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
@@ -17,8 +16,9 @@ use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::*;
+use crate::lobby;
 use crate::proto::{self, Client, ClientState, RawPacket};
-use crate::server::{self, Server};
+use crate::server::{self, Server, State};
 use crate::service;
 
 /// Proxy the given inbound stream to a target address.
@@ -31,7 +31,7 @@ pub async fn serve(
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
-    // Incoming buffer
+    // Incoming buffer and packet holding queue
     let mut buf = BytesMut::new();
 
     // Remember inbound packets, used for client holding and forwarding
@@ -120,8 +120,26 @@ pub async fn serve(
                 break;
             }
 
-            // Start server if not starting yet
-            Server::start(config.clone(), server.clone(), username).await;
+            if !lobby::DONT_START_SERVER {
+                // Start server if not starting yet
+                Server::start(config.clone(), server.clone(), username).await;
+            }
+
+            // Lobby mode
+            if lobby::USE_LOBBY {
+                // // Hold login packet and remaining read bytes
+                // hold_queue.extend(raw);
+                // hold_queue.extend(buf.split_off(0));
+
+                // Build queue with login packet and any additionally received
+                let mut queue = BytesMut::with_capacity(raw.len() + buf.len());
+                queue.extend(raw);
+                queue.extend(buf.split_off(0));
+
+                // Start lobby
+                lobby::serve(client, inbound, config, server, queue).await?;
+                return Ok(());
+            }
 
             // Use join occupy methods
             for method in &config.join.methods {
@@ -283,7 +301,7 @@ async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(0, data).encode()?;
+    let response = RawPacket::new(proto::LOGIN_PACKET_ID_DISCONNECT, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())
 }
 
