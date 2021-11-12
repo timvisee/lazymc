@@ -135,7 +135,7 @@ cargo build --release
 A list of third-party implementations, projects using `lazymc`, that you might
 find useful:
 
-- Docker: [crbanman/papermc-lazymc](https://hub.docker.com/r/crbanman/papermc-lazymc) _PaperMC with lazymc in Docker_
+- Docker: [crbanman/papermc-lazymc](https://hub.docker.com/r/crbanman/papermc-lazymc) _(PaperMC with lazymc in Docker)_
 
 ## License
 

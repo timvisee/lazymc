@@ -177,7 +177,7 @@ pub async fn hold<'a>(
 
                 // If hold timeout is reached, kick client
                 if since.elapsed().as_secs() >= timeout {
-                    warn!(target: "lazymc", "Holding client reached timeout of {}s, disconnecting", timeout);
+                    warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", timeout);
                     kick(&config.messages.login_starting, &mut inbound.split().1).await?;
                     return Ok(());
                 }
