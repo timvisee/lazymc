@@ -132,6 +132,8 @@ fn rewrite_server_properties(config: &Config) {
     let mut changes = HashMap::from([
         ("server-ip", config.server.address.ip().to_string()),
         ("server-port", config.server.address.port().to_string()),
+        ("enable-status", "true".into()),
+        ("prevent-proxy-connections", "false".into()),
         ("query.port", config.server.address.port().to_string()),
     ]);
 
