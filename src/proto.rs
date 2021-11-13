@@ -44,14 +44,15 @@ pub mod packets {
         pub const SERVER_PLAYER_POS_ROT: i32 = 0x12;
         pub const SERVER_PLAYER_POS: i32 = 0x11;
         pub const CLIENT_KEEP_ALIVE: i32 = 0x21;
-        pub const CLIENT_CHUNK_DATA: i32 = 0x22;
         pub const CLIENT_PLAYER_POS_LOOK: i32 = 0x38;
+        pub const CLIENT_RESPAWN: i32 = 0x3D;
         pub const CLIENT_SET_TITLE_TEXT: i32 = 0x59;
         pub const CLIENT_SET_TITLE_SUBTITLE: i32 = 0x57;
         pub const CLIENT_SET_TITLE_TIMES: i32 = 0x5A;
         pub const CLIENT_TIME_UPDATE: i32 = 0x58;
         pub const CLIENT_CHAT_MSG: i32 = 0x0F;
         pub const CLIENT_SPAWN_POS: i32 = 0x4B;
+        pub const CLIENT_DISCONNECT: i32 = 0x1A;
     }
 }
 
