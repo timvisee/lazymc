@@ -45,6 +45,15 @@ const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
 /// Lobby clients may wait a maximum of 10 minutes for the server to come online.
 const SERVER_WAIT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
+/// Timeout for creating new server connection for lobby client.
+const SERVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+
+/// Timeout for server sending join game packet.
+///
+/// When the play state is reached, the server should immeditely respond with a join game packet.
+/// This defines the maximum timeout for waiting on it.
+const SERVER_JOIN_GAME_TIMEOUT: Duration = Duration::from_secs(20);
+
 /// Time to wait before responding to newly connected server.
 ///
 /// Notchian servers are slow, we must wait a little before sending play packets, because the
@@ -524,12 +533,29 @@ async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
     Err(())
 }
 
-/// Create connection to the server.
+/// Create connection to the server, with timeout.
+///
+/// This will initialize the connection to the play state. Client details are used.
+async fn connect_to_server(
+    client_info: ClientInfo,
+    config: &Config,
+) -> Result<(TcpStream, BytesMut), ()> {
+    time::timeout(
+        SERVER_CONNECT_TIMEOUT,
+        connect_to_server_no_timeout(client_info, config),
+    )
+    .await
+    .map_err(|_| {
+        error!(target: "lazymc::lobby", "Creating new server connection for lobby client timed out after {}s", SERVER_CONNECT_TIMEOUT.as_secs());
+        ()
+    })?
+}
+
+/// Create connection to the server, with no timeout.
 ///
 /// This will initialize the connection to the play state. Client details are used.
 // TODO: clean this up
-// TODO: add timeout
-async fn connect_to_server(
+async fn connect_to_server_no_timeout(
     client_info: ClientInfo,
     config: &Config,
 ) -> Result<(TcpStream, BytesMut), ()> {
@@ -621,13 +647,30 @@ async fn connect_to_server(
     Err(())
 }
 
-/// Wait for join game packet on server connection.
+/// Wait for join game packet on server connection, with timeout.
+///
+/// This parses, consumes and returns the packet.
+async fn wait_for_server_join_game(
+    outbound: &mut TcpStream,
+    buf: &mut BytesMut,
+) -> Result<JoinGame, ()> {
+    time::timeout(
+        SERVER_JOIN_GAME_TIMEOUT,
+        wait_for_server_join_game_no_timeout(outbound, buf),
+    )
+    .await
+    .map_err(|_| {
+        error!(target: "lazymc::lobby", "Waiting for for game data from server for lobby client timed out after {}s", SERVER_JOIN_GAME_TIMEOUT.as_secs());
+        ()
+    })?
+}
+
+/// Wait for join game packet on server connection, with no timeout.
 ///
 /// This parses, consumes and returns the packet.
 // TODO: clean this up
 // TODO: do not drop error here, return Box<dyn Error>
-// TODO: add timeout
-async fn wait_for_server_join_game(
+async fn wait_for_server_join_game_no_timeout(
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
 ) -> Result<JoinGame, ()> {
