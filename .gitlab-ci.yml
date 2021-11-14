@@ -106,6 +106,76 @@ build-x86_64-linux-musl:
       - lazymc-$TARGET
     expire_in: 1 month
 
+# Build using Rust stable on Linux for ARMv7
+build-armv7-linux-gnu:
+  stage: build
+  image: ubuntu
+  needs: []
+  variables:
+    TARGET: armv7-unknown-linux-gnueabihf
+  cache:
+    <<: *rust-build-cache
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends build-essential
+    - |
+      apt-get install -y curl
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+      source $HOME/.cargo/env
+    - |
+      rustc --version
+      cargo --version
+  script:
+    - apt-get install -y gcc-arm-linux-gnueabihf
+    - rustup target add $TARGET
+
+    - mkdir -p ~/.cargo
+    - 'echo "[target.$TARGET]" >> ~/.cargo/config'
+    - 'echo "linker = \"arm-linux-gnueabihf-gcc\"" >> ~/.cargo/config'
+
+    - cargo build --target=$TARGET --release --locked --verbose
+    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
+  artifacts:
+    name: lazymc-armv7-linux-gnu
+    paths:
+      - lazymc-$TARGET
+    expire_in: 1 month
+
+# Build using Rust stable on Linux for aarch64
+build-aarch64-linux-gnu:
+  stage: build
+  image: ubuntu
+  needs: []
+  variables:
+    TARGET: aarch64-unknown-linux-gnu
+  cache:
+    <<: *rust-build-cache
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends build-essential
+    - |
+      apt-get install -y curl
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+      source $HOME/.cargo/env
+    - |
+      rustc --version
+      cargo --version
+  script:
+    - apt-get install -y gcc-aarch64-linux-gnu
+    - rustup target add $TARGET
+
+    - mkdir -p ~/.cargo
+    - 'echo "[target.$TARGET]" >> ~/.cargo/config'
+    - 'echo "linker = \"aarch64-linux-gnu-gcc\"" >> ~/.cargo/config'
+
+    - cargo build --target=$TARGET --release --locked --verbose
+    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
+  artifacts:
+    name: lazymc-aarch64-linux-gnu
+    paths:
+      - lazymc-$TARGET
+    expire_in: 1 month
+
 # Build using Rust stable on macOS
 build-macos:
   stage: build
