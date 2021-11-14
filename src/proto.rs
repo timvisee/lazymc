@@ -53,6 +53,7 @@ pub mod packets {
         pub const CLIENT_CHAT_MSG: i32 = 0x0F;
         pub const CLIENT_SPAWN_POS: i32 = 0x4B;
         pub const CLIENT_DISCONNECT: i32 = 0x1A;
+        pub const CLIENT_PLUGIN_MESSAGE: i32 = 0x18;
     }
 }
 
@@ -122,6 +123,22 @@ impl ClientState {
 impl Default for ClientState {
     fn default() -> Self {
         Self::Handshake
+    }
+}
+
+/// Client info, useful during connection handling.
+#[derive(Debug, Default)]
+pub struct ClientInfo {
+    /// Client protocol version.
+    pub protocol_version: Option<i32>,
+
+    /// Client username.
+    pub username: Option<String>,
+}
+
+impl ClientInfo {
+    pub fn empty() -> Self {
+        Self::default()
     }
 }
 

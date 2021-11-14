@@ -17,8 +17,8 @@ use minecraft_protocol::version::v1_14_4::login::{LoginDisconnect, LoginStart, L
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use minecraft_protocol::version::v1_17_1::game::{
     ChunkData, ClientBoundChatMessage, ClientBoundKeepAlive, GameDisconnect, JoinGame,
-    PlayerPositionAndLook, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, SpawnPosition,
-    TimeUpdate,
+    PlayerPositionAndLook, PluginMessage, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes,
+    SpawnPosition, TimeUpdate,
 };
 use nbt::CompoundTag;
 use tokio::io::{self, AsyncWriteExt};
@@ -29,7 +29,7 @@ use tokio::time;
 use uuid::Uuid;
 
 use crate::config::*;
-use crate::proto::{self, Client, ClientState, RawPacket};
+use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::proxy;
 use crate::server::{self, Server, State};
 use crate::service;
@@ -53,6 +53,7 @@ const TICKS_PER_SECOND: u32 = 20;
 // TODO: on error, nicely kick client with message
 pub async fn serve(
     client: Client,
+    client_info: ClientInfo,
     mut inbound: TcpStream,
     config: Arc<Config>,
     server: Arc<Server>,
@@ -62,6 +63,12 @@ pub async fn serve(
 
     // TODO: note this assumes the first receiving packet (over queue) is login start
     // TODO: assert client is in login mode!
+
+    // We must have useful client info
+    if client_info.username.is_none() {
+        error!(target: "lazymc::lobby", "Client username is unknown, closing connection");
+        return Err(());
+    }
 
     // Incoming buffer and packet holding queue
     let mut inbound_buf = queue;
@@ -99,7 +106,8 @@ pub async fn serve(
 
             // Wait for server to come online, then set up new connection to it
             stage_wait(config.clone(), server.clone(), &mut writer).await?;
-            let (mut outbound, mut server_buf) = connect_to_server(client, &config, server).await?;
+            let (mut outbound, mut server_buf) =
+                connect_to_server(client, client_info, &config, server).await?;
 
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
@@ -137,36 +145,8 @@ pub async fn serve(
             return Ok(());
         }
 
-        // TODO: is this ever called?
-        if client_state == ClientState::Play
-            && packet.id == proto::packets::play::SERVER_CLIENT_SETTINGS
-        {
-            debug!(target: "lazymc::lobby", "Ignoring client settings packet");
-            continue;
-        }
-
-        // TODO: is this ever called?
-        if client_state == ClientState::Play
-            && packet.id == proto::packets::play::SERVER_PLUGIN_MESSAGE
-        {
-            debug!(target: "lazymc::lobby", "Ignoring plugin message packet");
-            continue;
-        }
-
-        // TODO: is this ever called?
-        if client_state == ClientState::Play
-            && packet.id == proto::packets::play::SERVER_PLAYER_POS_ROT
-        {
-            debug!(target: "lazymc::lobby", "Ignoring player pos rot packet");
-            continue;
-        }
-
-        // TODO: is this ever called?
-        if client_state == ClientState::Play && packet.id == proto::packets::play::SERVER_PLAYER_POS
-        {
-            debug!(target: "lazymc::lobby", "Ignoring player pos packet");
-            continue;
-        }
+        // TODO: when receiving Login Plugin Request, respond with empty payload
+        // See: https://wiki.vg/Protocol#Login_Plugin_Request
 
         // Show unhandled packet warning
         debug!(target: "lazymc", "Received unhandled packet:");
@@ -232,7 +212,9 @@ async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     // Send initial game join
     send_lobby_join_game(writer).await?;
 
-    // TODO: send plugin message for brand
+    // Send server brand
+    // TODO: does client ever receive real brand after this?
+    send_lobby_brand(writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
     // TODO: is sending spawn this required?
@@ -281,6 +263,24 @@ async fn send_lobby_join_game(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     packet.encode(&mut data).map_err(|_| ())?;
 
     let response = RawPacket::new(proto::packets::play::CLIENT_JOIN_GAME, data).encode()?;
+    writer.write_all(&response).await.map_err(|_| ())?;
+
+    Ok(())
+}
+
+/// Send lobby brand to client.
+async fn send_lobby_brand(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+    let brand = b"lazymc".to_vec();
+
+    let packet = PluginMessage {
+        channel: "minecraft:brand".into(),
+        data: brand,
+    };
+
+    let mut data = Vec::new();
+    packet.encode(&mut data).map_err(|_| ())?;
+
+    let response = RawPacket::new(proto::packets::play::CLIENT_PLUGIN_MESSAGE, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -537,6 +537,7 @@ async fn wait_for_server<'a>(config: Arc<Config>, server: Arc<Server>) -> Result
 // TODO: clean this up
 async fn connect_to_server(
     real_client: Client,
+    client_info: ClientInfo,
     config: &Config,
     server: Arc<Server>,
 ) -> Result<(TcpStream, BytesMut), ()> {
@@ -551,9 +552,9 @@ async fn connect_to_server(
     let tmp_client = Client::default();
     tmp_client.set_state(ClientState::Login);
 
-    // TODO: use client version
+    // Handshake packet
     let packet = Handshake {
-        protocol_version: 755,
+        protocol_version: client_info.protocol_version.unwrap(),
         server_addr: config.server.address.ip().to_string(),
         server_port: config.server.address.port(),
         next_state: ClientState::Login.to_id(),
@@ -566,9 +567,8 @@ async fn connect_to_server(
     writer.write_all(&request).await.map_err(|_| ())?;
 
     // Request login start
-    // TODO: use client username
     let packet = LoginStart {
-        name: "timvisee".into(),
+        name: client_info.username.ok_or(())?,
     };
 
     let mut data = Vec::new();

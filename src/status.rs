@@ -17,7 +17,7 @@ use tokio::time;
 
 use crate::config::*;
 use crate::lobby;
-use crate::proto::{self, Client, ClientState, RawPacket};
+use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::server::{self, Server, State};
 use crate::service;
 
@@ -39,6 +39,8 @@ pub async fn serve(
         || config.join.methods.contains(&Method::Forward);
     let mut inbound_history = BytesMut::new();
 
+    let mut client_info = ClientInfo::empty();
+
     loop {
         // Read packet from stream
         let (packet, raw) = match proto::read_packet(&mut buf, &mut reader).await {
@@ -55,22 +57,28 @@ pub async fn serve(
 
         // Hijack handshake
         if client_state == ClientState::Handshake && packet.id == proto::STATUS_PACKET_ID_STATUS {
-            // Parse handshake, grab new state
-            let new_state = match Handshake::decode(&mut packet.data.as_slice()) {
-                Ok(handshake) => match ClientState::from_id(handshake.next_state) {
-                    Some(state) => state,
-                    None => {
-                        error!(target: "lazymc", "Client tried to switch into unknown protcol state ({}), disconnecting", handshake.next_state);
-                        break;
-                    }
-                },
+            // Parse handshake
+            let handshake = match Handshake::decode(&mut packet.data.as_slice()) {
+                Ok(handshake) => handshake,
                 Err(_) => {
                     debug!(target: "lazymc", "Got malformed handshake from client, disconnecting");
                     break;
                 }
             };
 
-            // Update client state
+            // Parse new state
+            let new_state = match ClientState::from_id(handshake.next_state) {
+                Some(state) => state,
+                None => {
+                    error!(target: "lazymc", "Client tried to switch into unknown protcol state ({}), disconnecting", handshake.next_state);
+                    break;
+                }
+            };
+
+            // Update client info and client state
+            client_info
+                .protocol_version
+                .replace(handshake.protocol_version);
             client.set_state(new_state);
 
             // If login handshake and holding is enabled, hold packets
@@ -103,10 +111,12 @@ pub async fn serve(
 
         // Hijack login start
         if client_state == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
-            // Try to get login username
+            // Try to get login username, update client info
+            // TODO: we should always parse this packet successfully
             let username = LoginStart::decode(&mut packet.data.as_slice())
                 .ok()
                 .map(|p| p.name);
+            client_info.username = username.clone();
 
             // Kick if lockout is enabled
             if config.lockout.enabled {
@@ -137,7 +147,7 @@ pub async fn serve(
                 queue.extend(buf.split_off(0));
 
                 // Start lobby
-                lobby::serve(client, inbound, config, server, queue).await?;
+                lobby::serve(client, client_info, inbound, config, server, queue).await?;
                 return Ok(());
             }
 
