@@ -46,6 +46,7 @@ pub mod packets {
     pub mod play {
         pub const CLIENT_CHAT_MSG: i32 = 0x0F;
         pub const CLIENT_PLUGIN_MESSAGE: i32 = 0x18;
+        pub const CLIENT_NAMED_SOUND_EFFECT: i32 = 0x19;
         pub const CLIENT_DISCONNECT: i32 = 0x1A;
         pub const CLIENT_KEEP_ALIVE: i32 = 0x21;
         pub const CLIENT_JOIN_GAME: i32 = 0x26;

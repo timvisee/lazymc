@@ -11,8 +11,8 @@ use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess};
 use minecraft_protocol::version::v1_17_1::game::{
-    ClientBoundKeepAlive, JoinGame, PlayerPositionAndLook, PluginMessage, Respawn,
-    SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
+    ClientBoundKeepAlive, JoinGame, NamedSoundEffect, PlayerPositionAndLook, PluginMessage,
+    Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
 use nbt::CompoundTag;
 use tokio::io::{self, AsyncWriteExt};
@@ -32,6 +32,8 @@ use crate::server::{Server, State};
 pub const USE_LOBBY: bool = true;
 pub const DONT_START_SERVER: bool = false;
 const STARTING_BANNER: &str = "§2Server is starting\n§7⌛ Please wait...";
+const JOIN_SOUND: bool = true;
+const JOIN_SOUND_NAME: &str = "block.note_block.chime";
 
 /// Interval for server state polling when waiting on server to come online.
 const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -123,13 +125,18 @@ pub async fn serve(
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
 
+            // Reset lobby title, play sound effect
+            send_lobby_title(&mut writer, "").await?;
+            if JOIN_SOUND {
+                send_lobby_sound_effect(&mut writer).await?;
+            }
+
             // Wait a second because Notchian servers are slow
             // See: https://wiki.vg/Protocol#Login_Success
             trace!(target: "lazymc::lobby", "Waiting a second before relaying client connection...");
             time::sleep(SERVER_WARMUP).await;
 
-            // Reset our lobby title, send respawn packet to teleport to real server world
-            send_lobby_title(&mut writer, "").await?;
+            // Send respawn packet, initiates teleport to real server world
             send_respawn_from_join(&mut writer, join_game).await?;
 
             // Drain inbound connection so we don't confuse the server
@@ -382,6 +389,28 @@ async fn send_lobby_title(writer: &mut WriteHalf<'_>, text: &str) -> Result<(), 
     packet.encode(&mut data).map_err(|_| ())?;
 
     let response = RawPacket::new(proto::packets::play::CLIENT_SET_TITLE_TIMES, data).encode()?;
+    writer.write_all(&response).await.map_err(|_| ())?;
+
+    Ok(())
+}
+
+/// Send lobby ready sound effect to client.
+async fn send_lobby_sound_effect(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+    let packet = NamedSoundEffect {
+        sound_name: JOIN_SOUND_NAME.into(),
+        sound_category: 0,
+        effect_pos_x: 0,
+        effect_pos_y: 0,
+        effect_pos_z: 0,
+        volume: 1.0,
+        pitch: 1.0,
+    };
+
+    let mut data = Vec::new();
+    packet.encode(&mut data).map_err(|_| ())?;
+
+    let response =
+        RawPacket::new(proto::packets::play::CLIENT_NAMED_SOUND_EFFECT, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
