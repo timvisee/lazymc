@@ -1,24 +1,17 @@
-// TODO: remove this before feature release!
-#![allow(unused)]
-
 use std::io::ErrorKind;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bytes::BytesMut;
 use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
-use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
-use minecraft_protocol::version::v1_14_4::game::{GameMode, MessagePosition};
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
-use minecraft_protocol::version::v1_14_4::login::{LoginDisconnect, LoginStart, LoginSuccess};
-use minecraft_protocol::version::v1_14_4::status::StatusResponse;
+use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess};
 use minecraft_protocol::version::v1_17_1::game::{
-    ChunkData, ClientBoundChatMessage, ClientBoundKeepAlive, GameDisconnect, JoinGame,
-    PlayerPositionAndLook, PluginMessage, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes,
-    SpawnPosition, TimeUpdate,
+    ClientBoundKeepAlive, JoinGame, PlayerPositionAndLook, PluginMessage, Respawn,
+    SetTitleSubtitle, SetTitleText, SetTitleTimes, SpawnPosition, TimeUpdate,
 };
 use nbt::CompoundTag;
 use tokio::io::{self, AsyncWriteExt};
@@ -31,14 +24,12 @@ use uuid::Uuid;
 use crate::config::*;
 use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::proxy;
-use crate::server::{self, Server, State};
-use crate::service;
+use crate::server::{Server, State};
 
 // TODO: remove this before releasing feature
 pub const USE_LOBBY: bool = true;
 pub const DONT_START_SERVER: bool = false;
 const STARTING_BANNER: &str = "§2Server is starting\n§7⌛ Please wait...";
-const HOLD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Interval for server state polling when waiting on server to come online.
 const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -70,13 +61,12 @@ pub async fn serve(
         return Err(());
     }
 
-    // Incoming buffer and packet holding queue
+    // Incoming buffer
     let mut inbound_buf = queue;
-    let mut server_queue = BytesMut::new();
 
     loop {
         // Read packet from stream
-        let (packet, raw) = match proto::read_packet(&mut inbound_buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(&mut inbound_buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -89,7 +79,9 @@ pub async fn serve(
         let client_state = client.state();
 
         // Hijack login start
-        if client_state == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
+        if client_state == ClientState::Login
+            && packet.id == proto::packets::login::SERVER_LOGIN_START
+        {
             // Parse login start packet
             let login_start = LoginStart::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
@@ -102,12 +94,11 @@ pub async fn serve(
             trace!(target: "lazymc::lobby", "Client login success, sending required play packets for lobby world");
 
             // Send packets to client required to get into workable play state for lobby world
-            send_lobby_play_packets(&mut writer).await;
+            send_lobby_play_packets(&mut writer).await?;
 
             // Wait for server to come online, then set up new connection to it
-            stage_wait(config.clone(), server.clone(), &mut writer).await?;
-            let (mut outbound, mut server_buf) =
-                connect_to_server(client, client_info, &config, server).await?;
+            stage_wait(server.clone(), &mut writer).await?;
+            let (mut outbound, mut server_buf) = connect_to_server(client_info, &config).await?;
 
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
@@ -133,7 +124,7 @@ pub async fn serve(
 
             // Client and server connection ready now, move client to proxy
             debug!(target: "lazymc::lobby", "Server connection ready, moving client to proxy");
-            route_proxy(inbound, outbound, config, server_buf);
+            route_proxy(inbound, outbound, server_buf);
 
             return Ok(());
         }
@@ -157,21 +148,6 @@ pub async fn serve(
     Ok(())
 }
 
-/// Kick client with a message.
-///
-/// Should close connection afterwards.
-async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let packet = LoginDisconnect {
-        reason: Message::new(Payload::text(msg)),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(proto::LOGIN_PACKET_ID_DISCONNECT, data).encode()?;
-    writer.write_all(&response).await.map_err(|_| ())
-}
-
 /// Respond to client with login success packet
 // TODO: support online mode here
 async fn respond_login_success(
@@ -192,7 +168,7 @@ async fn respond_login_success(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::LOGIN_PACKET_ID_LOGIN_SUCCESS, data).encode()?;
+    let response = RawPacket::new(proto::packets::login::CLIENT_LOGIN_SUCCESS, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -459,11 +435,7 @@ async fn keep_alive_loop(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 ///
 /// During this stage we keep sending keep-alive and title packets to the client to keep it active.
 // TODO: should we use some timeout in here, could be large?
-async fn stage_wait<'a>(
-    config: Arc<Config>,
-    server: Arc<Server>,
-    writer: &mut WriteHalf<'a>,
-) -> Result<(), ()> {
+async fn stage_wait<'a>(server: Arc<Server>, writer: &mut WriteHalf<'a>) -> Result<(), ()> {
     // Ensure server poll interval is less than keep alive interval
     // We need to wait on the smallest interval in the following loop
     assert!(
@@ -473,7 +445,7 @@ async fn stage_wait<'a>(
 
     select! {
         a = keep_alive_loop(writer) => a,
-        b = wait_for_server(config, server) => b,
+        b = wait_for_server(server) => b,
     }
 }
 
@@ -481,13 +453,13 @@ async fn stage_wait<'a>(
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
 // TODO: go through this, use proper error messages
-async fn wait_for_server<'a>(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
+async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
     debug!(target: "lazymc::lobby", "Waiting on server...");
 
     // Set up polling interval, get timeout
-    let mut poll_interval = time::interval(HOLD_POLL_INTERVAL);
-    let since = Instant::now();
-    let timeout = config.time.hold_client_for as u64;
+    let mut poll_interval = time::interval(SERVER_POLL_INTERVAL);
+    // let since = Instant::now();
+    // let timeout = config.time.hold_client_for as u64;
 
     loop {
         // TODO: wait for start signal over channel instead of polling
@@ -528,10 +500,8 @@ async fn wait_for_server<'a>(config: Arc<Config>, server: Arc<Server>) -> Result
 /// This will initialize the connection to the play state. Client details are used.
 // TODO: clean this up
 async fn connect_to_server(
-    real_client: Client,
     client_info: ClientInfo,
     config: &Config,
-    server: Arc<Server>,
 ) -> Result<(TcpStream, BytesMut), ()> {
     // Open connection
     // TODO: on connect fail, ping server and redirect to serve_status if offline
@@ -555,7 +525,7 @@ async fn connect_to_server(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let request = RawPacket::new(proto::HANDSHAKE_PACKET_ID_HANDSHAKE, data).encode()?;
+    let request = RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, data).encode()?;
     writer.write_all(&request).await.map_err(|_| ())?;
 
     // Request login start
@@ -566,7 +536,7 @@ async fn connect_to_server(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let request = RawPacket::new(proto::LOGIN_PACKET_ID_LOGIN_START, data).encode()?;
+    let request = RawPacket::new(proto::packets::login::SERVER_LOGIN_START, data).encode()?;
     writer.write_all(&request).await.map_err(|_| ())?;
 
     // Incoming buffer
@@ -574,7 +544,7 @@ async fn connect_to_server(
 
     loop {
         // Read packet from stream
-        let (packet, raw) = match proto::read_packet(&mut buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(&mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -587,7 +557,9 @@ async fn connect_to_server(
         let client_state = tmp_client.state();
 
         // Hijack login success
-        if client_state == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_SUCCESS {
+        if client_state == ClientState::Login
+            && packet.id == proto::packets::login::CLIENT_LOGIN_SUCCESS
+        {
             trace!(target: "lazymc::lobby", "Received login success from server connection, change to play mode");
 
             // TODO: parse this packet to ensure it's fine
@@ -627,14 +599,14 @@ async fn connect_to_server(
 // TODO: do not drop error here, return Box<dyn Error>
 // TODO: add timeout
 async fn wait_for_server_join_game(
-    mut outbound: &mut TcpStream,
+    outbound: &mut TcpStream,
     buf: &mut BytesMut,
 ) -> Result<JoinGame, ()> {
     let (mut reader, mut writer) = outbound.split();
 
     loop {
         // Read packet from stream
-        let (packet, raw) = match proto::read_packet(buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -675,12 +647,7 @@ async fn wait_for_server_join_game(
 /// `inbound_queue` is used for data already received from the server, that needs to be pushed to
 /// the client.
 #[inline]
-pub fn route_proxy(
-    inbound: TcpStream,
-    outbound: TcpStream,
-    config: Arc<Config>,
-    inbound_queue: BytesMut,
-) {
+pub fn route_proxy(inbound: TcpStream, outbound: TcpStream, inbound_queue: BytesMut) {
     // When server is online, proxy all
     let service = async move {
         proxy::proxy_inbound_outbound_with_queue(inbound, outbound, &inbound_queue, &[])
@@ -709,7 +676,7 @@ async fn drain_stream<'a>(reader: &mut ReadHalf<'a>) -> Result<(), ()> {
             // TODO: stop if read < drain_buf.len() ?
             Ok(read) if read == 0 => return Ok(()),
             Err(err) if err.kind() == ErrorKind::WouldBlock => return Ok(()),
-            Ok(read) => continue,
+            Ok(_) => continue,
             Err(err) => {
                 // TODO: remove after debug
                 dbg!("drain err", err);
@@ -722,16 +689,16 @@ async fn drain_stream<'a>(reader: &mut ReadHalf<'a>) -> Result<(), ()> {
 /// Read NBT CompoundTag from SNBT.
 fn snbt_to_compound_tag(data: &str) -> CompoundTag {
     use nbt::decode::read_compound_tag;
-    use quartz_nbt::io::{self, Flavor};
+    use quartz_nbt::io::{write_nbt, Flavor};
     use quartz_nbt::snbt;
-    use std::io::Cursor;
 
     // Parse SNBT data
     let compound = snbt::parse(data).expect("failed to parse SNBT");
 
     // Encode to binary
     let mut binary = Vec::new();
-    io::write_nbt(&mut binary, None, &compound, Flavor::Uncompressed);
+    write_nbt(&mut binary, None, &compound, Flavor::Uncompressed)
+        .expect("failed to encode NBT CompoundTag as binary");
 
     // Parse binary with usable NBT create
     read_compound_tag(&mut &*binary).unwrap()

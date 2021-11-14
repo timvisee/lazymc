@@ -56,7 +56,9 @@ pub async fn serve(
         let client_state = client.state();
 
         // Hijack handshake
-        if client_state == ClientState::Handshake && packet.id == proto::STATUS_PACKET_ID_STATUS {
+        if client_state == ClientState::Handshake
+            && packet.id == proto::packets::handshake::SERVER_HANDSHAKE
+        {
             // Parse handshake
             let handshake = match Handshake::decode(&mut packet.data.as_slice()) {
                 Ok(handshake) => handshake,
@@ -90,7 +92,8 @@ pub async fn serve(
         }
 
         // Hijack server status packet
-        if client_state == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_STATUS {
+        if client_state == ClientState::Status && packet.id == proto::packets::status::SERVER_STATUS
+        {
             let server_status = server_status(&config, &server).await;
             let packet = StatusResponse { server_status };
 
@@ -104,13 +107,15 @@ pub async fn serve(
         }
 
         // Hijack ping packet
-        if client_state == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_PING {
+        if client_state == ClientState::Status && packet.id == proto::packets::status::SERVER_PING {
             writer.write_all(&raw).await.map_err(|_| ())?;
             continue;
         }
 
         // Hijack login start
-        if client_state == ClientState::Login && packet.id == proto::LOGIN_PACKET_ID_LOGIN_START {
+        if client_state == ClientState::Login
+            && packet.id == proto::packets::login::SERVER_LOGIN_START
+        {
             // Try to get login username, update client info
             // TODO: we should always parse this packet successfully
             let username = LoginStart::decode(&mut packet.data.as_slice())
@@ -311,7 +316,7 @@ async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::LOGIN_PACKET_ID_DISCONNECT, data).encode()?;
+    let response = RawPacket::new(proto::packets::login::CLIENT_DISCONNECT, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())
 }
 

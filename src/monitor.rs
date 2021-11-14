@@ -126,7 +126,7 @@ async fn send_handshake(
     let mut packet = Vec::new();
     handshake.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(proto::HANDSHAKE_PACKET_ID_HANDSHAKE, packet)
+    let raw = RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, packet)
         .encode()
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -136,7 +136,7 @@ async fn send_handshake(
 
 /// Send status request.
 async fn request_status(stream: &mut TcpStream) -> Result<(), ()> {
-    let raw = RawPacket::new(proto::STATUS_PACKET_ID_STATUS, vec![])
+    let raw = RawPacket::new(proto::packets::status::SERVER_STATUS, vec![])
         .encode()
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -151,7 +151,7 @@ async fn send_ping(stream: &mut TcpStream) -> Result<u64, ()> {
     let mut packet = Vec::new();
     ping.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(proto::STATUS_PACKET_ID_PING, packet)
+    let raw = RawPacket::new(proto::packets::status::SERVER_PING, packet)
         .encode()
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -173,7 +173,7 @@ async fn wait_for_status(stream: &mut TcpStream) -> Result<ServerStatus, ()> {
         };
 
         // Catch status response
-        if packet.id == proto::STATUS_PACKET_ID_STATUS {
+        if packet.id == proto::packets::status::CLIENT_STATUS {
             let status = StatusResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
             return Ok(status.server_status);
         }
@@ -206,7 +206,7 @@ async fn wait_for_ping(stream: &mut TcpStream, token: u64) -> Result<(), ()> {
         };
 
         // Catch ping response
-        if packet.id == proto::STATUS_PACKET_ID_PING {
+        if packet.id == proto::packets::status::CLIENT_PING {
             let ping = PingResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
             // Ping token must match
