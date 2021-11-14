@@ -133,9 +133,13 @@ fn rewrite_server_properties(config: &Config) {
         ("server-ip", config.server.address.ip().to_string()),
         ("server-port", config.server.address.port().to_string()),
         ("enable-status", "true".into()),
-        ("prevent-proxy-connections", "false".into()),
         ("query.port", config.server.address.port().to_string()),
     ]);
+
+    // If connecting to server over non-loopback address, disable proxy blocking
+    if !config.server.address.ip().is_loopback() {
+        changes.extend([("prevent-proxy-connections", "false".into())]);
+    }
 
     // Add RCON configuration
     #[cfg(feature = "rcon")]
