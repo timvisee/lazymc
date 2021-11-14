@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -49,6 +50,9 @@ const SERVER_WARMUP: Duration = Duration::from_secs(1);
 ///
 /// Shown in F3 menu. Updated once client is relayed to real server.
 const SERVER_BRAND: &[u8] = b"lazymc";
+
+/// Auto incrementing ID source for keep alive packets.
+const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
 
 /// Serve lobby service for given client connection.
 ///
@@ -110,7 +114,7 @@ pub async fn serve(
             trace!(target: "lazymc::lobby", "Client login success, sending required play packets for lobby world");
 
             // Send packets to client required to get into workable play state for lobby world
-            send_lobby_play_packets(&mut writer).await?;
+            send_lobby_play_packets(&mut writer, &server).await?;
 
             // Wait for server to come online, then set up new connection to it
             stage_wait(server.clone(), &mut writer).await?;
@@ -129,8 +133,9 @@ pub async fn serve(
             send_respawn_from_join(&mut writer, join_game).await?;
 
             // Drain inbound connection so we don't confuse the server
-            // TODO: can we drain everything? we might need to forward everything to server except
+            // TODO: can we void everything? we might need to forward everything to server except
             //       for some blacklisted ones
+            trace!(target: "lazymc::lobby", "Voiding remaining incoming lobby client data before relay to real server");
             drain_stream(&mut reader).await?;
 
             // Client and server connection ready now, move client to proxy
@@ -183,54 +188,58 @@ async fn respond_login_success(
 }
 
 /// Send packets to client to get workable play state for lobby world.
-async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>, server: &Server) -> Result<(), ()> {
     // See: https://wiki.vg/Protocol_FAQ#What.27s_the_normal_login_sequence_for_a_client.3F
 
     // Send initial game join
-    send_lobby_join_game(writer).await?;
+    send_lobby_join_game(writer, server).await?;
 
     // Send server brand
     send_lobby_brand(writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
+    // Note: If this screen stays, we may need to send it a second time
     send_lobby_player_pos(writer).await?;
 
     // Notify client of world time, required once before keep-alive packets
     send_lobby_time_update(writer).await?;
 
-    // TODO: we might need to send player_pos one more time
-
     Ok(())
 }
 
 /// Send initial join game packet to client for lobby.
-async fn send_lobby_join_game(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+async fn send_lobby_join_game(writer: &mut WriteHalf<'_>, server: &Server) -> Result<(), ()> {
     // Send Minecrafts default states, slightly customised for lobby world
-    // TODO: use values from real server here!
-    let packet = JoinGame {
-        // TODO: ID must not collide with any other entity, possibly send huge number
-        entity_id: 0,
-        hardcore: false,
-        game_mode: 3,
-        previous_game_mode: -1i8 as u8,
-        world_names: vec![
-            "minecraft:overworld".into(),
-            "minecraft:the_nether".into(),
-            "minecraft:the_end".into(),
-        ],
-        dimension_codec: snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt")),
-        dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
-        // TODO: test whether using minecraft:overworld breaks?
-        world_name: "lazymc:lobby".into(),
-        hashed_seed: 0,
-        max_players: 20,
-        // TODO: try very low view distance?
-        view_distance: 10,
-        // TODO: set to true!
-        reduced_debug_info: false,
-        enable_respawn_screen: false,
-        is_debug: true,
-        is_flat: false,
+    let packet = {
+        let status = server.status();
+
+        JoinGame {
+            // Player ID must be unique, if it collides with another server entity ID the player gets
+            // in a weird state and cannot move
+            entity_id: 0,
+            // TODO: use real server value
+            hardcore: false,
+            game_mode: 3,
+            previous_game_mode: -1i8 as u8,
+            world_names: vec![
+                "minecraft:overworld".into(),
+                "minecraft:the_nether".into(),
+                "minecraft:the_end".into(),
+            ],
+            dimension_codec: snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt")),
+            dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
+            world_name: "lazymc:lobby".into(),
+            hashed_seed: 0,
+            max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
+            // TODO: use real server value
+            view_distance: 10,
+            // TODO: use real server value
+            reduced_debug_info: false,
+            // TODO: use real server value
+            enable_respawn_screen: true,
+            is_debug: true,
+            is_flat: false,
+        }
     };
 
     let mut data = Vec::new();
@@ -304,8 +313,10 @@ async fn send_lobby_time_update(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 ///
 /// Required periodically in play mode to prevent client timeout.
 async fn send_keep_alive(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    // TODO: keep picking random ID!
-    let packet = ClientBoundKeepAlive { id: 0 };
+    let packet = ClientBoundKeepAlive {
+        // Keep sending new IDs
+        id: KEEP_ALIVE_ID.fetch_add(1, Ordering::Relaxed),
+    };
 
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
@@ -353,11 +364,11 @@ async fn send_lobby_title(writer: &mut WriteHalf<'_>, text: &str) -> Result<(), 
 
     // Set title times
     let packet = if title.is_empty() && subtitle.is_empty() {
-        // TODO: figure out real default values here
+        // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
         SetTitleTimes {
             fade_in: 10,
-            stay: 100,
-            fade_out: 10,
+            stay: 70,
+            fade_out: 20,
         }
     } else {
         SetTitleTimes {
@@ -440,14 +451,11 @@ async fn stage_wait<'a>(server: Arc<Server>, writer: &mut WriteHalf<'a>) -> Resu
 /// Wait for the server to come online.
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
-// TODO: go through this, use proper error messages
 async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
     debug!(target: "lazymc::lobby", "Waiting on server...");
 
-    // Set up polling interval, get timeout
+    // Set up polling interval
     let mut poll_interval = time::interval(SERVER_POLL_INTERVAL);
-    // let since = Instant::now();
-    // let timeout = config.time.hold_client_for as u64;
 
     loop {
         // TODO: wait for start signal over channel instead of polling
@@ -459,9 +467,6 @@ async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
             // Still waiting on server start
             State::Starting => {
                 trace!(target: "lazymc::lobby", "Server not ready, holding client for longer");
-
-                // TODO: add timeout here?
-
                 continue;
             }
 
@@ -487,6 +492,7 @@ async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
 ///
 /// This will initialize the connection to the play state. Client details are used.
 // TODO: clean this up
+// TODO: add timeout
 async fn connect_to_server(
     client_info: ClientInfo,
     config: &Config,
@@ -569,14 +575,13 @@ async fn connect_to_server(
         debug!(target: "lazymc::lobby", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
 
-    // // Gracefully close connection
-    // match writer.shutdown().await {
-    //     Ok(_) => {}
-    //     Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-    //     Err(_) => return Err(()),
-    // }
+    // Gracefully close connection
+    match writer.shutdown().await {
+        Ok(_) => {}
+        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
+        Err(_) => return Err(()),
+    }
 
-    // TODO: do we ever reach this?
     Err(())
 }
 
@@ -606,7 +611,6 @@ async fn wait_for_server_join_game(
         // Catch join game
         if packet.id == proto::packets::play::CLIENT_JOIN_GAME {
             let join_game = JoinGame::decode(&mut packet.data.as_slice()).map_err(|err| {
-                // TODO: remove this debug
                 dbg!(err);
                 ()
             })?;
@@ -626,7 +630,6 @@ async fn wait_for_server_join_game(
         Err(_) => return Err(()),
     }
 
-    // TODO: will we ever reach this?
     Err(())
 }
 
@@ -650,24 +653,16 @@ pub fn route_proxy(inbound: TcpStream, outbound: TcpStream, inbound_queue: Bytes
     tokio::spawn(service);
 }
 
-/// Drain given reader until nothing is left.
-// TODO: go through this, use proper error messages
+/// Drain given reader until nothing is left voiding all data.
 async fn drain_stream<'a>(reader: &mut ReadHalf<'a>) -> Result<(), ()> {
-    // TODO: remove after debug
-    trace!(target: "lazymc::lobby", "Draining stream...");
-
-    // TODO: use other size, look at default std::io size?
-    let mut drain_buf = [0; 1024];
-
+    let mut drain_buf = [0; 8 * 1024];
     loop {
         match reader.try_read(&mut drain_buf) {
-            // TODO: stop if read < drain_buf.len() ?
             Ok(read) if read == 0 => return Ok(()),
             Err(err) if err.kind() == ErrorKind::WouldBlock => return Ok(()),
             Ok(_) => continue,
             Err(err) => {
-                // TODO: remove after debug
-                dbg!("drain err", err);
+                error!(target: "lazymc::lobby", "Failed to drain lobby client connection before relaying to real server. Maybe already disconnected? Error: {:?}", err);
                 return Ok(());
             }
         }
