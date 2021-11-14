@@ -7,6 +7,7 @@
 
 ## Nice to have
 
+- Use server whitelist/blacklist
 - Console error if server already started on port, not through `lazymc`
 - Kick with message if proxy-to-server connection fails for new client. 
 - Test configuration on start (server dir exists, command not empty)
