@@ -11,7 +11,7 @@ use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess};
 use minecraft_protocol::version::v1_17_1::game::{
     ClientBoundKeepAlive, JoinGame, PlayerPositionAndLook, PluginMessage, Respawn,
-    SetTitleSubtitle, SetTitleText, SetTitleTimes, SpawnPosition, TimeUpdate,
+    SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
 use nbt::CompoundTag;
 use tokio::io::{self, AsyncWriteExt};
@@ -22,6 +22,7 @@ use tokio::time;
 use uuid::Uuid;
 
 use crate::config::*;
+use crate::mc;
 use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::proxy;
 use crate::server::{Server, State};
@@ -37,9 +38,21 @@ const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// Interval to send keep-alive packets at.
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
-/// Minecraft ticks per second.
-const TICKS_PER_SECOND: u32 = 20;
+/// Time to wait before responding to newly connected server.
+///
+/// Notchian servers are slow, we must wait a little before sending play packets, because the
+/// server needs time to transition the client into this state.
+/// See warning at: https://wiki.vg/Protocol#Login_Success
+const SERVER_WARMUP: Duration = Duration::from_secs(1);
 
+/// Server brand to send to client in lobby world.
+///
+/// Shown in F3 menu. Updated once client is relayed to real server.
+const SERVER_BRAND: &[u8] = b"lazymc";
+
+/// Serve lobby service for given client connection.
+///
+/// The client must be in the login state, or this will error.
 // TODO: do not drop error here, return Box<dyn Error>
 // TODO: on error, nicely kick client with message
 pub async fn serve(
@@ -52,8 +65,11 @@ pub async fn serve(
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
-    // TODO: note this assumes the first receiving packet (over queue) is login start
-    // TODO: assert client is in login mode!
+    // Client must be in login state
+    if client.state() != ClientState::Login {
+        error!(target: "lazymc::lobby", "Client reached lobby service with invalid state: {:?}", client.state());
+        return Err(());
+    }
 
     // We must have useful client info
     if client_info.username.is_none() {
@@ -103,12 +119,13 @@ pub async fn serve(
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
 
-            // Reset our lobby title
-            send_lobby_title(&mut writer, "").await?;
+            // Wait a second because Notchian servers are slow
+            // See: https://wiki.vg/Protocol#Login_Success
+            trace!(target: "lazymc::lobby", "Waiting a second before relaying client connection...");
+            time::sleep(SERVER_WARMUP).await;
 
-            // Send respawn packet, initiates teleport to real server world
-            // TODO: should we just send one packet?
-            send_respawn_from_join(&mut writer, join_game.clone()).await?;
+            // Reset our lobby title, send respawn packet to teleport to real server world
+            send_lobby_title(&mut writer, "").await?;
             send_respawn_from_join(&mut writer, join_game).await?;
 
             // Drain inbound connection so we don't confuse the server
@@ -116,14 +133,8 @@ pub async fn serve(
             //       for some blacklisted ones
             drain_stream(&mut reader).await?;
 
-            // TODO: should we wait a little?
-            // Wait a little because Notchian servers are slow
-            // See: https://wiki.vg/Protocol#Login_Success
-            // trace!(target: "lazymc::lobby", "Waiting a second before relaying client connection...");
-            // time::sleep(Duration::from_secs(1)).await;
-
             // Client and server connection ready now, move client to proxy
-            debug!(target: "lazymc::lobby", "Server connection ready, moving client to proxy");
+            debug!(target: "lazymc::lobby", "Server connection ready, relaying lobby client to proxy");
             route_proxy(inbound, outbound, server_buf);
 
             return Ok(());
@@ -156,13 +167,10 @@ async fn respond_login_success(
 ) -> Result<(), ()> {
     let packet = LoginSuccess {
         uuid: Uuid::new_v3(
-            // TODO: use Uuid::null() here as namespace?
-            &Uuid::new_v3(&Uuid::NAMESPACE_OID, b"OfflinePlayer"),
+            &Uuid::new_v3(&Uuid::nil(), b"OfflinePlayer"),
             login_start.name.as_bytes(),
         ),
         username: login_start.name.clone(),
-        // uuid: Uuid::parse_str("35ee313b-d89a-41b8-b25e-d32e8aff0389").unwrap(),
-        // username: "Username".into(),
     };
 
     let mut data = Vec::new();
@@ -185,8 +193,6 @@ async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     send_lobby_brand(writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
-    // TODO: is sending spawn this required?
-    send_lobby_spawn_pos(writer).await?;
     send_lobby_player_pos(writer).await?;
 
     // Notify client of world time, required once before keep-alive packets
@@ -238,33 +244,15 @@ async fn send_lobby_join_game(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 
 /// Send lobby brand to client.
 async fn send_lobby_brand(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let brand = b"lazymc".to_vec();
-
     let packet = PluginMessage {
         channel: "minecraft:brand".into(),
-        data: brand,
+        data: SERVER_BRAND.into(),
     };
 
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
     let response = RawPacket::new(proto::packets::play::CLIENT_PLUGIN_MESSAGE, data).encode()?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
-}
-
-/// Send lobby spawn position to client.
-async fn send_lobby_spawn_pos(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let packet = SpawnPosition {
-        position: 0,
-        angle: 0.0,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(proto::packets::play::CLIENT_SPAWN_POS, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -374,7 +362,7 @@ async fn send_lobby_title(writer: &mut WriteHalf<'_>, text: &str) -> Result<(), 
     } else {
         SetTitleTimes {
             fade_in: 0,
-            stay: KEEP_ALIVE_INTERVAL.as_secs() as i32 * TICKS_PER_SECOND as i32 * 2,
+            stay: KEEP_ALIVE_INTERVAL.as_secs() as i32 * mc::TICKS_PER_SECOND as i32 * 2,
             fade_out: 0,
         }
     };
