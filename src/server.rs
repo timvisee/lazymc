@@ -5,9 +5,14 @@ use std::time::{Duration, Instant};
 use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
+use tokio::time;
 
 use crate::config::Config;
 use crate::os;
+
+/// Server cooldown after the process quit.
+/// Used to give it some more time to quit forgotten threads, such as for RCON.
+const SERVER_QUIT_COOLDOWN: Duration = Duration::from_millis(2500);
 
 /// Server state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -364,8 +369,13 @@ pub async fn invoke_server_cmd(
         }
     };
 
-    // Set state to stopped, update server PID
+    // Forget server PID
     state.pid.lock().unwrap().take();
+
+    // Give server a little more time to quit forgotten threads
+    time::sleep(SERVER_QUIT_COOLDOWN).await;
+
+    // Set server state to stopped
     state.update_state(State::Stopped, &config);
 
     // Restart on crash
