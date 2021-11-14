@@ -31,7 +31,14 @@ notepad lazymc.toml
 .\lazymc start
 ```
 
-Everything should now be running. Connect with your Minecraft client to wake
+Before you use this in production, please ensure starting and stopping the
+server works as expected by connecting to it once. Watch `lazymc`s output while
+it starts and stops. If stopping results in errors, fix this first to prevent
+corrupting world/user data.
+
+Follow this repository with the _Watch_ button on the top right to be notified of new releases.
+
+Everything should now be ready to go! Connect with your Minecraft client to wake
 your server up!
 
 _Note: if you put `lazymc` in `PATH`, or if you
