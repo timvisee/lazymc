@@ -135,9 +135,10 @@ pub async fn serve(
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
 
-            // Reset lobby title, play sound effect
+            // Reset lobby title, player position and play sound effect
             send_lobby_title(&mut writer, "").await?;
             if JOIN_SOUND {
+                send_lobby_player_pos(&mut writer).await?;
                 send_lobby_sound_effect(&mut writer).await?;
             }
 
@@ -215,7 +216,6 @@ async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>, server: &Server) ->
     send_lobby_brand(writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
-    // Note: If this screen stays, we may need to send it a second time
     send_lobby_player_pos(writer).await?;
 
     // Notify client of world time, required once before keep-alive packets
