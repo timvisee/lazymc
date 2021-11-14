@@ -163,9 +163,7 @@ pub async fn hold<'a>(
         let mut state = server.state_receiver();
         loop {
             // Wait for state change
-            if state.changed().await.is_err() {
-                break Err(());
-            }
+            state.changed().await.unwrap();
 
             match state.borrow().deref() {
                 // Still waiting on server start
@@ -176,19 +174,19 @@ pub async fn hold<'a>(
 
                 // Server started, start relaying and proxy
                 State::Started => {
-                    break Ok(());
+                    break true;
                 }
 
                 // Server stopping, this shouldn't happen, kick
                 State::Stopping => {
                     warn!(target: "lazymc", "Server stopping for held client, disconnecting");
-                    break Err(());
+                    break false;
                 }
 
                 // Server stopped, this shouldn't happen, disconnect
                 State::Stopped => {
                     error!(target: "lazymc", "Server stopped for held client, disconnecting");
-                    break Err(());
+                    break false;
                 }
             }
         }
@@ -198,14 +196,14 @@ pub async fn hold<'a>(
     let timeout = Duration::from_secs(config.time.hold_client_for as u64);
     match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
-        Ok(Ok(())) => {
+        Ok(true) => {
             info!(target: "lazymc", "Server ready for held client, relaying to server");
             service::server::route_proxy_queue(inbound, config, hold_queue);
             return Ok(());
         }
 
         // Server stopping/stopped, this shouldn't happen, kick
-        Ok(Err(())) => {
+        Ok(false) => {
             warn!(target: "lazymc", "Server stopping for held client, disconnecting");
             kick(&config.messages.login_stopping, &mut inbound.split().1).await?;
         }
