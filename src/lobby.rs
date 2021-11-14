@@ -112,13 +112,6 @@ pub async fn serve(
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
 
-            // TODO: we might have excess server_buf data here, do something with it!
-            if !server_buf.is_empty() {
-                error!(target: "lazymc::lobby", "Got excess data from server for client, throwing it away ({} bytes)", server_buf.len());
-                // TODO: remove after debug
-                dbg!(server_buf);
-            }
-
             // Reset our lobby title
             send_lobby_title(&mut writer, "").await?;
 
@@ -140,7 +133,7 @@ pub async fn serve(
 
             // Client and server connection ready now, move client to proxy
             debug!(target: "lazymc::lobby", "Server connection ready, moving client to proxy");
-            route_proxy(inbound, outbound, config);
+            route_proxy(inbound, outbound, config, server_buf);
 
             return Ok(());
         }
@@ -213,7 +206,6 @@ async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     send_lobby_join_game(writer).await?;
 
     // Send server brand
-    // TODO: does client ever receive real brand after this?
     send_lobby_brand(writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
@@ -679,11 +671,19 @@ async fn wait_for_server_join_game(
 }
 
 /// Route our lobby client through the proxy to the real server, spawning a new task.
+///
+/// `inbound_queue` is used for data already received from the server, that needs to be pushed to
+/// the client.
 #[inline]
-pub fn route_proxy(inbound: TcpStream, outbound: TcpStream, config: Arc<Config>) {
+pub fn route_proxy(
+    inbound: TcpStream,
+    outbound: TcpStream,
+    config: Arc<Config>,
+    inbound_queue: BytesMut,
+) {
     // When server is online, proxy all
     let service = async move {
-        proxy::proxy_inbound_outbound_with_queue(inbound, outbound, &[], &[])
+        proxy::proxy_inbound_outbound_with_queue(inbound, outbound, &inbound_queue, &[])
             .map(|r| {
                 if let Err(err) = r {
                     warn!(target: "lazymc", "Failed to proxy: {}", err);
