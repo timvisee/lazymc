@@ -20,7 +20,7 @@ pub unsafe fn kill_gracefully(pid: u32) -> bool {
     let result = libc::kill(pid as i32, libc::SIGTERM);
 
     if result != 0 {
-        trace!(target: "lazymc", "SIGTERM failed: {}", result);
+        warn!(target: "lazymc", "Sending SIGTERM signal to server failed: {}", result);
     }
 
     result == 0

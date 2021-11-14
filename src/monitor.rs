@@ -55,9 +55,7 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
         // Sleep server when it's bedtime
         if server.should_sleep(&config) {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
-            if !server.stop(&config).await {
-                warn!(target: "lazymc", "Failed to stop server");
-            }
+            server.stop(&config).await;
         }
 
         // Check whether we should force kill server

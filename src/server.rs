@@ -210,6 +210,7 @@ impl Server {
         // We must have a running process
         let has_process = self.pid.lock().unwrap().is_some();
         if !has_process {
+            debug!(target: "lazymc", "Tried to stop server, while no PID is known");
             return false;
         }
 
@@ -225,6 +226,7 @@ impl Server {
             return true;
         }
 
+        warn!(target: "lazymc", "Failed to stop server, no more suitable stopping method to use");
         false
     }
 
@@ -394,6 +396,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
 
     // RCON must be enabled
     if !config.rcon.enabled {
+        trace!(target: "lazymc", "Not using RCON to stop server, disabled in config");
         return false;
     }
 
@@ -414,6 +417,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
     // Invoke stop
     if let Err(err) = rcon.cmd("stop").await {
         error!(target: "lazymc", "Failed to invoke stop through RCON: {}", err);
+        return false;
     }
 
     // Set server to stopping state
@@ -431,13 +435,21 @@ fn stop_server_signal(config: &Config, server: &Server) -> bool {
     // Grab PID
     let pid = match *server.pid.lock().unwrap() {
         Some(pid) => pid,
-        None => return false,
+        None => {
+            debug!(target: "lazymc", "Could not send stop signal to server process, PID unknown");
+            return false;
+        }
     };
 
-    // Set stopping state, send kill signal
-    // TODO: revert state on failure
-    server.update_state(State::Stopping, config);
-    crate::os::kill_gracefully(pid);
+    // Send kill signal
+    if !crate::os::kill_gracefully(pid) {
+        error!(target: "lazymc", "Failed to send stop signal to server process");
+        return false;
+    }
+
+    // Update from starting/started to stopping
+    server.update_state_from(Some(State::Starting), State::Stopping, config);
+    server.update_state_from(Some(State::Started), State::Stopping, config);
 
     true
 }
