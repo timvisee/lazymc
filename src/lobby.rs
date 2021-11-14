@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,11 +36,14 @@ const STARTING_BANNER: &str = "§2Server is starting\n§7⌛ Please wait...";
 const JOIN_SOUND: bool = true;
 const JOIN_SOUND_NAME: &str = "block.note_block.chime";
 
-/// Interval for server state polling when waiting on server to come online.
-const SERVER_POLL_INTERVAL: Duration = Duration::from_millis(500);
-
 /// Interval to send keep-alive packets at.
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Auto incrementing ID source for keep alive packets.
+const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
+
+/// Lobby clients may wait a maximum of 10 minutes for the server to come online.
+const SERVER_WAIT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// Time to wait before responding to newly connected server.
 ///
@@ -52,9 +56,6 @@ const SERVER_WARMUP: Duration = Duration::from_secs(1);
 ///
 /// Shown in F3 menu. Updated once client is relayed to real server.
 const SERVER_BRAND: &[u8] = b"lazymc";
-
-/// Auto incrementing ID source for keep alive packets.
-const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
 
 /// Serve lobby service for given client connection.
 ///
@@ -462,15 +463,7 @@ async fn keep_alive_loop(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 /// In this stage we wait for the server to come online.
 ///
 /// During this stage we keep sending keep-alive and title packets to the client to keep it active.
-// TODO: should we use some timeout in here, could be large?
 async fn stage_wait<'a>(server: Arc<Server>, writer: &mut WriteHalf<'a>) -> Result<(), ()> {
-    // Ensure server poll interval is less than keep alive interval
-    // We need to wait on the smallest interval in the following loop
-    assert!(
-        SERVER_POLL_INTERVAL <= KEEP_ALIVE_INTERVAL,
-        "SERVER_POLL_INTERVAL should be <= KEEP_ALIVE_INTERVAL"
-    );
-
     select! {
         a = keep_alive_loop(writer) => a,
         b = wait_for_server(server) => b,
@@ -481,36 +474,50 @@ async fn stage_wait<'a>(server: Arc<Server>, writer: &mut WriteHalf<'a>) -> Resu
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
 async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
-    debug!(target: "lazymc::lobby", "Waiting on server...");
+    debug!(target: "lazymc::lobby", "Waiting on server to come online...");
 
-    // Set up polling interval
-    let mut poll_interval = time::interval(SERVER_POLL_INTERVAL);
+    // A task to wait for suitable server state
+    // Waits for started state, errors if stopping/stopped state is reached
+    let task_wait = async {
+        let mut state = server.state_receiver();
+        loop {
+            // Wait for state change
+            state.changed().await.unwrap();
 
-    loop {
-        // TODO: wait for start signal over channel instead of polling
-        poll_interval.tick().await;
+            match state.borrow().deref() {
+                // Still waiting on server start
+                State::Starting => {
+                    trace!(target: "lazymc::lobby", "Server not ready, holding client for longer");
+                    continue;
+                }
 
-        trace!(target: "lazymc::lobby", "Polling outbound server state for lobby client...");
+                // Server started, start relaying and proxy
+                State::Started => {
+                    break true;
+                }
 
-        match server.state() {
-            // Still waiting on server start
-            State::Starting => {
-                trace!(target: "lazymc::lobby", "Server not ready, holding client for longer");
-                continue;
+                // Server stopping, this shouldn't happen, kick
+                State::Stopping | State::Stopped => {
+                    break false;
+                }
             }
+        }
+    };
 
-            // Server started, start relaying and proxy
-            State::Started => {
-                // TODO: drop client if already disconnected
+    // Wait for server state with timeout
+    match time::timeout(SERVER_WAIT_TIMEOUT, task_wait).await {
+        // Relay client to proxy
+        Ok(true) => {
+            debug!(target: "lazymc::lobby", "Server ready for lobby client");
+            return Ok(());
+        }
 
-                debug!(target: "lazymc::lobby", "Server ready for lobby client!");
-                return Ok(());
-            }
+        // Server stopping/stopped, this shouldn't happen, disconnect
+        Ok(false) => {}
 
-            // Server stopping or stopped, this shouldn't happen
-            State::Stopping | State::Stopped => {
-                break;
-            }
+        // Timeout reached, disconnect
+        Err(_) => {
+            warn!(target: "lazymc::lobby", "Lobby client waiting for server to come online reached timeout of {}s", SERVER_WAIT_TIMEOUT.as_secs());
         }
     }
 
