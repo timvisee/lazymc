@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
+use tokio::sync::watch;
 use tokio::time;
 
 use crate::config::Config;
@@ -61,6 +62,12 @@ pub struct Server {
     /// Matches `State`, utilzes AtomicU8 for better performance.
     state: AtomicU8,
 
+    /// State watch sender, broadcast state changes.
+    state_watch_sender: watch::Sender<State>,
+
+    /// State watch receiver, subscribe to state changes.
+    state_watch_receiver: watch::Receiver<State>,
+
     /// Server process PID.
     ///
     /// Set if a server process is running.
@@ -90,6 +97,11 @@ impl Server {
     /// Get current state.
     pub fn state(&self) -> State {
         State::from_u8(self.state.load(Ordering::Relaxed))
+    }
+
+    /// Get state receiver to subscribe on server state changes.
+    pub fn state_receiver(&self) -> watch::Receiver<State> {
+        self.state_watch_receiver.clone()
     }
 
     /// Set a new state.
@@ -128,6 +140,9 @@ impl Server {
 
         trace!("Change server state from {:?} to {:?}", old, new);
 
+        // Broadcast change
+        let _ = self.state_watch_sender.send(new);
+
         // Update kill at time for starting/stopping state
         *self.kill_at.write().unwrap() = match new {
             State::Starting if config.time.start_timeout > 0 => {
@@ -155,7 +170,7 @@ impl Server {
         true
     }
 
-    /// Update status as polled from the server.
+    /// Update status as obtained from the server.
     ///
     /// This updates various other internal things depending on the current state and the given
     /// status.
@@ -311,8 +326,12 @@ impl Server {
 
 impl Default for Server {
     fn default() -> Self {
+        let (state_watch_sender, state_watch_receiver) = watch::channel(State::Stopped);
+
         Self {
             state: AtomicU8::new(State::Stopped.to_u8()),
+            state_watch_sender,
+            state_watch_receiver,
             pid: Default::default(),
             status: Default::default(),
             last_active: Default::default(),

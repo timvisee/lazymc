@@ -36,6 +36,8 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
     let mut poll_interval = time::interval(MONITOR_POLL_INTERVAL);
 
     loop {
+        poll_interval.tick().await;
+
         // Poll server state and update internal status
         trace!(target: "lazymc::monitor", "Fetching status for {} ... ", addr);
         let status = poll_server(&config, &server, addr).await;
@@ -65,8 +67,6 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
                 warn!(target: "lazymc", "Failed to force kill server");
             }
         }
-
-        poll_interval.tick().await;
     }
 }
 

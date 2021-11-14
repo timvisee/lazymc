@@ -1,5 +1,6 @@
+use std::ops::Deref;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::server::State;
 use bytes::BytesMut;
@@ -19,9 +20,6 @@ use crate::config::*;
 use crate::proto::{self, Client, ClientState, RawPacket};
 use crate::server::{self, Server};
 use crate::service;
-
-/// Client holding server state poll interval.
-const HOLD_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
@@ -159,54 +157,63 @@ pub async fn hold<'a>(
 ) -> Result<(), ()> {
     trace!(target: "lazymc", "Started holding client");
 
-    // Set up polling interval, get timeout
-    let mut poll_interval = time::interval(HOLD_POLL_INTERVAL);
-    let since = Instant::now();
-    let timeout = config.time.hold_client_for as u64;
+    // A task to wait for suitable server state
+    // Waits for started state, errors if stopping/stopped state is reached
+    let task_wait = async {
+        let mut state = server.state_receiver();
+        loop {
+            // Wait for state change
+            if state.changed().await.is_err() {
+                break Err(());
+            }
 
-    loop {
-        // TODO: wait for start signal over channel instead of polling
-        poll_interval.tick().await;
-
-        trace!("Polling server state for holding client...");
-
-        match server.state() {
-            // Still waiting on server start
-            State::Starting => {
-                trace!(target: "lazymc", "Server not ready, holding client for longer");
-
-                // If hold timeout is reached, kick client
-                if since.elapsed().as_secs() >= timeout {
-                    warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", timeout);
-                    kick(&config.messages.login_starting, &mut inbound.split().1).await?;
-                    return Ok(());
+            match state.borrow().deref() {
+                // Still waiting on server start
+                State::Starting => {
+                    trace!(target: "lazymc", "Server not ready, holding client for longer");
+                    continue;
                 }
 
-                continue;
-            }
+                // Server started, start relaying and proxy
+                State::Started => {
+                    break Ok(());
+                }
 
-            // Server started, start relaying and proxy
-            State::Started => {
-                // TODO: drop client if already disconnected
+                // Server stopping, this shouldn't happen, kick
+                State::Stopping => {
+                    warn!(target: "lazymc", "Server stopping for held client, disconnecting");
+                    break Err(());
+                }
 
-                // Relay client to proxy
-                info!(target: "lazymc", "Server ready for held client, relaying to server");
-                service::server::route_proxy_queue(inbound, config, hold_queue);
-                return Ok(());
+                // Server stopped, this shouldn't happen, disconnect
+                State::Stopped => {
+                    error!(target: "lazymc", "Server stopped for held client, disconnecting");
+                    break Err(());
+                }
             }
+        }
+    };
 
-            // Server stopping, this shouldn't happen, kick
-            State::Stopping => {
-                warn!(target: "lazymc", "Server stopping for held client, disconnecting");
-                kick(&config.messages.login_stopping, &mut inbound.split().1).await?;
-                break;
-            }
+    // Wait for server state with timeout
+    let timeout = Duration::from_secs(config.time.hold_client_for as u64);
+    match time::timeout(timeout, task_wait).await {
+        // Relay client to proxy
+        Ok(Ok(())) => {
+            info!(target: "lazymc", "Server ready for held client, relaying to server");
+            service::server::route_proxy_queue(inbound, config, hold_queue);
+            return Ok(());
+        }
 
-            // Server stopped, this shouldn't happen, disconnect
-            State::Stopped => {
-                error!(target: "lazymc", "Server stopped for held client, disconnecting");
-                break;
-            }
+        // Server stopping/stopped, this shouldn't happen, kick
+        Ok(Err(())) => {
+            warn!(target: "lazymc", "Server stopping for held client, disconnecting");
+            kick(&config.messages.login_stopping, &mut inbound.split().1).await?;
+        }
+
+        // Timeout reached, kick with starting message
+        Err(_) => {
+            warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", config.time.hold_client_for);
+            kick(&config.messages.login_starting, &mut inbound.split().1).await?;
         }
     }
 
