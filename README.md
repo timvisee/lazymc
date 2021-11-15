@@ -36,7 +36,9 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 
 - Very efficient, lightweight & low-profile (~3KB RAM)
 - Supports Minecraft Java Edition 1.6+, supports modded (e.g. Forge, FTB)
-- Transparent join: hold clients when server starts, relay when ready, without them noticing
+- Configure joining client occupation methods:
+  - Hold: hold clients when server starts, relay when ready, without them noticing
+  - Kick: kick clients when server starts, with a starting message
 - Customizable MOTD and login messages
 - Automatically manages `server.properties` (host, port and RCON settings)
 - Graceful server sleep/shutdown through RCON (with `SIGTERM` fallback on Linux/Unix)
