@@ -39,6 +39,7 @@ shlex = "1.1"
 thiserror = "1.0"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "io-util", "net", "macros", "time", "process", "signal", "sync"] }
 toml = "0.5"
+version-compare = "0.1"
 
 # Feature: rcon
 rust_rcon = { package = "rcon", version = "0.5", optional = true }

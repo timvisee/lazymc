@@ -5,12 +5,16 @@ use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use serde::Deserialize;
+use version_compare::Cmp;
 
 use crate::proto;
 use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
 
 /// Default configuration file location.
 pub const CONFIG_FILE: &str = "lazymc.toml";
+
+/// Configuration version user should be using, or warning will be shown.
+const CONFIG_VERSION: &str = "0.2.0";
 
 /// Load config from file, based on CLI arguments.
 ///
@@ -96,13 +100,32 @@ pub struct Config {
     /// Advanced configuration.
     #[serde(default)]
     pub advanced: Advanced,
+
+    /// Config configuration.
+    #[serde(default)]
+    pub config: ConfigConfig,
 }
 
 impl Config {
     /// Load configuration from file.
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, io::Error> {
         let data = fs::read(path)?;
-        let config = toml::from_slice(&data)?;
+        let config: Config = toml::from_slice(&data)?;
+
+        // Show warning if config version is problematic
+        match &config.config.version {
+            None => warn!(target: "lazymc::config", "Config version unknown, it may be outdated"),
+            Some(version) => match version_compare::compare_to(version, CONFIG_VERSION, Cmp::Ge) {
+                Ok(false) => {
+                    warn!(target: "lazymc::config", "Config is for older lazymc version, you may need to update it")
+                }
+                Err(_) => {
+                    warn!(target: "lazymc::config", "Config version is invalid, you may need to update it")
+                }
+                Ok(true) => {}
+            },
+        }
+
         Ok(config)
     }
 }
@@ -338,6 +361,20 @@ impl Default for Advanced {
         Self {
             rewrite_server_properties: true,
         }
+    }
+}
+
+/// Config configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct ConfigConfig {
+    /// Configuration for lazymc version.
+    pub version: Option<String>,
+}
+
+impl Default for ConfigConfig {
+    fn default() -> Self {
+        Self { version: None }
     }
 }
 
