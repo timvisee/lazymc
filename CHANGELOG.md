@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 (2021-11-15)
+
+- Add lockout feature, enable to kick all connecting clients with a message
+- Add option to configure list of join methods to occupy client with while server is starting (kick, hold, forward, lobby)
+- Add lobby join method, keeps client in lobby world on emulated server, teleports to real server when it is ready (highly experimental)
+- Add forward join method to forward (proxy) client to other host while server is starting
+- Restructure `lazymc.toml` configuration
+- Increase packet reading buffer size to speed things up
+- Add support for Minecraft packet compression
+- Show warning if config version is outdated or invalid
+- Various fixes and improvements
+
 ## 0.1.3 (2021-11-15)
 
 - Fix binary release
