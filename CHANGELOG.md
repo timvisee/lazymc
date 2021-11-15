@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2 (2021-11-15)
+
+- Add Linux ARMv7 and aarch64 releases
+- RCON now works if server is running while server command already quit
+- Various RCON tweaks in an attempt to make it more robust and reliable (cooldown, exclusive lock, invocation spacing)
+- Increase server monitoring timeout to 20 seconds
+- Improve waiting for server logic when holding client
+- Various fixes and improvements
+
 ## 0.1.1 (2021-11-14)
 
 - Make server sleeping errors more descriptive
