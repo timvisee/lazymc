@@ -248,6 +248,8 @@ release-gitlab-generic-package:
   dependencies:
     - build-x86_64-linux-gnu
     - build-x86_64-linux-musl
+    - build-armv7-linux-gnu
+    - build-aarch64-linux-gnu
     - build-macos
     - build-x86_64-windows
   only:
