@@ -6,6 +6,7 @@ use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
 use tokio::process::Command;
 use tokio::sync::watch;
+use tokio::sync::Semaphore;
 use tokio::time;
 
 use crate::config::Config;
@@ -98,6 +99,10 @@ pub struct Server {
     ///
     /// Used as starting/stopping timeout.
     kill_at: RwLock<Option<Instant>>,
+
+    /// Lock for exclusive RCON operations.
+    #[cfg(feature = "rcon")]
+    rcon_lock: Semaphore,
 
     /// Last time server was stopped over RCON.
     #[cfg(feature = "rcon")]
@@ -342,6 +347,8 @@ impl Default for Server {
             keep_online_until: Default::default(),
             kill_at: Default::default(),
             #[cfg(feature = "rcon")]
+            rcon_lock: Semaphore::new(1),
+            #[cfg(feature = "rcon")]
             rcon_last_stop: Default::default(),
         }
     }
@@ -425,6 +432,9 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
         return false;
     }
 
+    // Grab RCON lock
+    let rcon_lock = server.rcon_lock.acquire().await.unwrap();
+
     // Ensure RCON has cooled down
     let rcon_cooled_down = server
         .rcon_last_stop
@@ -464,6 +474,8 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
         .unwrap()
         .replace(Instant::now());
     server.update_state(State::Stopping, config);
+
+    drop(rcon_lock);
 
     // Gracefully close connection
     rcon.close().await;
