@@ -32,6 +32,9 @@ pub const PROTO_DEFAULT_PROTOCOL: u32 = 756;
 // TODO: read this from server.properties instead
 pub const COMPRESSION_THRESHOLD: i32 = 256;
 
+/// Default buffer size when reading packets.
+const BUF_SIZE: usize = 8 * 1024;
+
 /// Minecraft protocol packet IDs.
 #[allow(unused)]
 pub mod packets {
@@ -323,7 +326,7 @@ pub async fn read_packet(
     // Keep reading until we have at least 2 bytes
     while buf.len() < 2 {
         // Read packet from socket
-        let mut tmp = Vec::with_capacity(64);
+        let mut tmp = Vec::with_capacity(BUF_SIZE);
         match stream.read_buf(&mut tmp).await {
             Ok(_) => {}
             Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
@@ -351,7 +354,7 @@ pub async fn read_packet(
     // Keep reading until we have all packet bytes
     while buf.len() < consumed + len as usize {
         // Read packet from socket
-        let mut tmp = Vec::with_capacity(64);
+        let mut tmp = Vec::with_capacity(BUF_SIZE);
         match stream.read_buf(&mut tmp).await {
             Ok(_) => {}
             Err(err) if err.kind() == io::ErrorKind::ConnectionReset => return Ok(None),
