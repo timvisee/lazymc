@@ -228,7 +228,7 @@ async fn send_lobby_play_packets(writer: &mut WriteHalf<'_>, server: &Server) ->
 async fn send_lobby_join_game(writer: &mut WriteHalf<'_>, server: &Server) -> Result<(), ()> {
     // Send Minecrafts default states, slightly customised for lobby world
     let packet = {
-        let status = server.status();
+        let status = server.status().await;
 
         JoinGame {
             // Player ID must be unique, if it collides with another server entity ID the player gets
