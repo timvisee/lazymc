@@ -23,10 +23,10 @@ use crate::server::{Server, State};
 const MONITOR_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Status request timeout in seconds.
-const STATUS_TIMEOUT: u64 = 8;
+const STATUS_TIMEOUT: u64 = 20;
 
 /// Ping request timeout in seconds.
-const PING_TIMEOUT: u64 = 10;
+const PING_TIMEOUT: u64 = 20;
 
 /// Monitor server.
 pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
