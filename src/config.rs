@@ -69,9 +69,21 @@ pub struct Config {
     #[serde(default)]
     pub time: Time,
 
-    /// Messages, shown to the user.
+    /// MOTD configuration.
     #[serde(default)]
-    pub messages: Messages,
+    pub motd: Motd,
+
+    /// Join configuration.
+    #[serde(default)]
+    pub join: Join,
+
+    /// Join kick configuration.
+    #[serde(default)]
+    pub join_kick: JoinKick,
+
+    /// Join hold configuration.
+    #[serde(default)]
+    pub join_hold: JoinHold,
 
     /// Lockout feature.
     #[serde(default)]
@@ -140,6 +152,14 @@ pub struct Server {
     /// Immediately wake server after crash.
     #[serde(default)]
     pub wake_on_crash: bool,
+
+    /// Server starting timeout. Force kill server process if it takes longer.
+    #[serde(default = "u32_300")]
+    pub start_timeout: u32,
+
+    /// Server stopping timeout. Force kill server process if it takes longer.
+    #[serde(default = "u32_150")]
+    pub stop_timeout: u32,
 }
 
 /// Time configuration.
@@ -152,24 +172,6 @@ pub struct Time {
     /// Minimum time in seconds to stay online when server is started.
     #[serde(default, alias = "minimum_online_time")]
     pub min_online_time: u32,
-
-    /// Hold client for number of seconds while server starts, instead of kicking immediately.
-    pub hold_client_for: u32,
-
-    /// Server starting timeout. Force kill server process if it takes longer.
-    #[serde(alias = "starting_timeout")]
-    pub start_timeout: u32,
-
-    /// Server stopping timeout. Force kill server process if it takes longer.
-    #[serde(alias = "stopping_timeout")]
-    pub stop_timeout: u32,
-}
-
-impl Time {
-    /// Whether to hold clients.
-    pub fn hold(&self) -> bool {
-        self.hold_client_for > 0
-    }
 }
 
 impl Default for Time {
@@ -177,46 +179,101 @@ impl Default for Time {
         Self {
             sleep_after: 60,
             min_online_time: 60,
-            hold_client_for: 25,
-            start_timeout: 300,
-            stop_timeout: 150,
         }
     }
 }
 
-/// Message configuration.
+/// MOTD configuration.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
-pub struct Messages {
+pub struct Motd {
     /// MOTD when server is sleeping.
-    pub motd_sleeping: String,
+    pub sleeping: String,
 
     /// MOTD when server is starting.
-    pub motd_starting: String,
+    pub starting: String,
 
     /// MOTD when server is stopping.
-    pub motd_stopping: String,
+    pub stopping: String,
 
     /// Use MOTD from Minecraft server once known.
-    pub use_server_motd: bool,
-
-    /// Login message when server is starting.
-    pub login_starting: String,
-
-    /// Login message when server is stopping.
-    pub login_stopping: String,
+    pub from_server: bool,
 }
 
-impl Default for Messages {
+impl Default for Motd {
     fn default() -> Self {
         Self {
-            motd_sleeping: "☠ Server is sleeping\n§2☻ Join to start it up".into(),
-            motd_starting: "§2☻ Server is starting...\n§7⌛ Please wait...".into(),
-            motd_stopping: "☠ Server going to sleep...\n⌛ Please wait...".into(),
-            use_server_motd: false,
-            login_starting: "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.".into(),
-            login_stopping: "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again.".into(),
+            sleeping: "☠ Server is sleeping\n§2☻ Join to start it up".into(),
+            starting: "§2☻ Server is starting...\n§7⌛ Please wait...".into(),
+            stopping: "☠ Server going to sleep...\n⌛ Please wait...".into(),
+            from_server: false,
         }
+    }
+}
+
+/// Join method types.
+#[derive(Debug, Deserialize, Copy, Clone, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Method {
+    Hold,
+    Kick,
+}
+
+/// Join configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Join {
+    /// Join methods.
+    pub methods: Vec<Method>,
+}
+
+impl Default for Join {
+    fn default() -> Self {
+        Self {
+            methods: vec![Method::Hold, Method::Kick],
+        }
+    }
+}
+
+/// Join kick configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct JoinKick {
+    /// Kick message when server is starting.
+    pub starting: String,
+
+    /// Kick message when server is stopping.
+    pub stopping: String,
+}
+
+impl Default for JoinKick {
+    fn default() -> Self {
+        Self {
+            starting: "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.".into(),
+            stopping: "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again.".into(),
+        }
+    }
+}
+
+/// Join hold configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct JoinHold {
+    /// Hold client for number of seconds on connect while server starts.
+    pub timeout: u32,
+}
+
+impl JoinHold {
+    /// Whether to hold clients.
+    // TODO: remove this
+    pub fn hold(&self) -> bool {
+        self.timeout > 0
+    }
+}
+
+impl Default for JoinHold {
+    fn default() -> Self {
+        Self { timeout: 25 }
     }
 }
 
@@ -290,4 +347,12 @@ fn option_pathbuf_dot() -> Option<PathBuf> {
 
 fn server_address_default() -> SocketAddr {
     "127.0.0.1:25566".parse().unwrap()
+}
+
+fn u32_300() -> u32 {
+    300
+}
+
+fn u32_150() -> u32 {
+    300
 }

@@ -39,6 +39,10 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Immediately wake server after crash.
 #wake_on_crash = false
 
+# Server start/stop timeout in seconds. Force kill server process if it takes too long.
+#start_timeout = 300
+#stop_timeout = 150
+
 [time]
 # Sleep after number of seconds.
 #sleep_after = 60
@@ -46,26 +50,34 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Minimum time in seconds to stay online when server is started.
 #minimum_online_time = 60
 
-# Hold client for number of seconds on connect while server starts.
-# 0 to disable and disconnect immediately, keep below Minecraft timeout of 30 seconds.
-#hold_client_for = 25
-
-# Server start/stop timeout in seconds. Force kill server process if it takes too long.
-#start_timeout = 300
-#stop_timeout = 150
-
-[messages]
-# MOTDs, shown in server browser.
-#motd_sleeping = "☠ Server is sleeping\n§2☻ Join to start it up"
-#motd_starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
-#motd_stopping = "☠ Server going to sleep...\n⌛ Please wait..."
+[motd]
+# MOTD, shown in server browser.
+#sleeping = "☠ Server is sleeping\n§2☻ Join to start it up"
+#starting = "§2☻ Server is starting...\n§7⌛ Please wait..."
+#stopping = "☠ Server going to sleep...\n⌛ Please wait..."
 
 # Use MOTD from Minecraft server once known.
-#use_server_motd = false
+#from_server = false
 
-# Login messages, when user tries to connect.
-#login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
-#login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
+[join]
+# Methods to use to occupy a client on join while the server is starting.
+# Methods are used in order if supported, and can be configured in the sections below.
+# If no method is set, the client is disconnected without a message.
+#methods = [
+#    "hold",
+#    "kick",
+#]
+
+[join.kick]
+# Message shown when client is kicked while server is starting/stopping.
+#starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
+#stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
+
+[join.hold]
+# Hold client for number of seconds on connect while server starts.
+# If timeout is reached, the next join method is attempted.
+# Keep below Minecraft timeout of 30 seconds.
+#timeout = 25
 
 [lockout]
 # Enable to prevent everybody from connecting through lazymc. Instantly kicks player.
@@ -90,3 +102,8 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 [advanced]
 # Automatically update values in Minecraft server.properties file as required.
 #rewrite_server_properties = true
+
+[config]
+# lazymc version this configuration is for.
+# Do not change unless you know what you're doing.
+version = "0.2.0"

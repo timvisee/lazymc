@@ -163,11 +163,11 @@ impl Server {
 
         // Update kill at time for starting/stopping state
         *self.kill_at.write().await = match new {
-            State::Starting if config.time.start_timeout > 0 => {
-                Some(Instant::now() + Duration::from_secs(config.time.start_timeout as u64))
+            State::Starting if config.server.start_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(config.server.start_timeout as u64))
             }
-            State::Stopping if config.time.stop_timeout > 0 => {
-                Some(Instant::now() + Duration::from_secs(config.time.stop_timeout as u64))
+            State::Stopping if config.server.stop_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(config.server.stop_timeout as u64))
             }
             _ => None,
         };

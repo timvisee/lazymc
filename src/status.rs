@@ -70,7 +70,7 @@ pub async fn serve(
             client.set_state(new_state);
 
             // If login handshake and holding is enabled, hold packets
-            if new_state == ClientState::Login && config.time.hold() {
+            if new_state == ClientState::Login && config.join_hold.hold() {
                 hold_queue.extend(raw);
             }
 
@@ -120,7 +120,7 @@ pub async fn serve(
             Server::start(config.clone(), server.clone(), username).await;
 
             // Hold client if enabled and starting
-            if config.time.hold() && server.state() == State::Starting {
+            if config.join_hold.hold() && server.state() == State::Starting {
                 // Hold login packet and remaining read bytes
                 hold_queue.extend(raw);
                 hold_queue.extend(buf.split_off(0));
@@ -133,9 +133,9 @@ pub async fn serve(
             // Select message and kick
             let msg = match server.state() {
                 server::State::Starting | server::State::Stopped | server::State::Started => {
-                    &config.messages.login_starting
+                    &config.join_kick.starting
                 }
-                server::State::Stopping => &config.messages.login_stopping,
+                server::State::Stopping => &config.join_kick.stopping,
             };
             kick(msg, &mut writer).await?;
 
@@ -205,7 +205,7 @@ pub async fn hold<'a>(
     };
 
     // Wait for server state with timeout
-    let timeout = Duration::from_secs(config.time.hold_client_for as u64);
+    let timeout = Duration::from_secs(config.join_hold.timeout as u64);
     match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
         Ok(true) => {
@@ -217,13 +217,13 @@ pub async fn hold<'a>(
         // Server stopping/stopped, this shouldn't happen, kick
         Ok(false) => {
             warn!(target: "lazymc", "Server stopping for held client, disconnecting");
-            kick(&config.messages.login_stopping, &mut inbound.split().1).await?;
+            kick(&config.join_kick.stopping, &mut inbound.split().1).await?;
         }
 
         // Timeout reached, kick with starting message
         Err(_) => {
-            warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", config.time.hold_client_for);
-            kick(&config.messages.login_starting, &mut inbound.split().1).await?;
+            warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", config.join_hold.timeout);
+            kick(&config.join_kick.starting, &mut inbound.split().1).await?;
         }
     }
 
@@ -270,13 +270,13 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
 
     // Select description, use server MOTD if enabled, or use configured
     let description = {
-        if config.messages.use_server_motd && status.is_some() {
+        if config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
             Message::new(Payload::text(match server.state() {
-                server::State::Stopped | server::State::Started => &config.messages.motd_sleeping,
-                server::State::Starting => &config.messages.motd_starting,
-                server::State::Stopping => &config.messages.motd_stopping,
+                server::State::Stopped | server::State::Started => &config.motd.sleeping,
+                server::State::Starting => &config.motd.starting,
+                server::State::Stopping => &config.motd.stopping,
             }))
         }
     };
