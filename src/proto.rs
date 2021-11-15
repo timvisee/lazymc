@@ -258,7 +258,7 @@ impl RawPacket {
         }
 
         // Read decompressed packet ID
-        return Self::read_packet_id_data(&decompressed);
+        Self::read_packet_id_data(&decompressed)
     }
 
     /// Encode packet to raw buffer.

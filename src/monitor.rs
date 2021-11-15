@@ -134,7 +134,7 @@ async fn send_handshake(
     handshake.encode(&mut packet).map_err(|_| ())?;
 
     let raw = RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, packet)
-        .encode(&client)
+        .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
 

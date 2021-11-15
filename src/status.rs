@@ -248,7 +248,6 @@ pub async fn serve(
 ///
 /// Returns holding status. `true` if client is held and it should be proxied, `false` it was held
 /// but it timed out.
-#[must_use]
 pub async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
     trace!(target: "lazymc", "Started holding client");
 
@@ -293,19 +292,19 @@ pub async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
         // Relay client to proxy
         Ok(true) => {
             info!(target: "lazymc", "Server ready for held client, relaying to server");
-            return Ok(true);
+            Ok(true)
         }
 
         // Server stopping/stopped, this shouldn't happen, kick
         Ok(false) => {
             warn!(target: "lazymc", "Server stopping for held client");
-            return Ok(false);
+            Ok(false)
         }
 
         // Timeout reached, kick with starting message
         Err(_) => {
             warn!(target: "lazymc", "Held client reached timeout of {}s", config.join.hold.timeout);
-            return Ok(false);
+            Ok(false)
         }
     }
 }

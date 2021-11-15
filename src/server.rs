@@ -330,7 +330,7 @@ impl Server {
     }
 
     /// Read last known server status.
-    pub async fn status<'a>(&'a self) -> RwLockReadGuard<'a, Option<ServerStatus>> {
+    pub async fn status(&self) -> RwLockReadGuard<'_, Option<ServerStatus>> {
         self.status.read().await
     }
 

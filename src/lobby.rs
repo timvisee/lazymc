@@ -33,7 +33,7 @@ use crate::server::{Server, State};
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Auto incrementing ID source for keep alive packets.
-const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
+static KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
 
 /// Timeout for creating new server connection for lobby client.
 const SERVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(2 * 60);
@@ -540,11 +540,11 @@ async fn keep_alive_loop(
 /// In this stage we wait for the server to come online.
 ///
 /// During this stage we keep sending keep-alive and title packets to the client to keep it active.
-async fn stage_wait<'a>(
+async fn stage_wait(
     client: &Client,
     server: &Server,
     config: &Config,
-    writer: &mut WriteHalf<'a>,
+    writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     select! {
         a = keep_alive_loop(client, writer, config) => a,
@@ -555,7 +555,7 @@ async fn stage_wait<'a>(
 /// Wait for the server to come online.
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
-async fn wait_for_server<'a>(server: &Server, config: &Config) -> Result<(), ()> {
+async fn wait_for_server(server: &Server, config: &Config) -> Result<(), ()> {
     debug!(target: "lazymc::lobby", "Waiting on server to come online...");
 
     // A task to wait for suitable server state
@@ -695,7 +695,6 @@ async fn connect_to_server_no_timeout(
             let set_compression =
                 SetCompression::decode(&mut packet.data.as_slice()).map_err(|err| {
                     dbg!(err);
-                    ()
                 })?;
 
             // Client and server compression threshold should match, show warning if not
@@ -785,7 +784,7 @@ async fn wait_for_server_join_game_no_timeout(
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(&client, buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(client, buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -839,7 +838,7 @@ pub fn route_proxy(inbound: TcpStream, outbound: TcpStream, inbound_queue: Bytes
 }
 
 /// Drain given reader until nothing is left voiding all data.
-async fn drain_stream<'a>(reader: &mut ReadHalf<'a>) -> Result<(), ()> {
+async fn drain_stream(reader: &mut ReadHalf<'_>) -> Result<(), ()> {
     let mut drain_buf = [0; 8 * 1024];
     loop {
         match reader.try_read(&mut drain_buf) {
