@@ -15,6 +15,13 @@ use crate::os;
 /// Used to give it some more time to quit forgotten threads, such as for RCON.
 const SERVER_QUIT_COOLDOWN: Duration = Duration::from_millis(2500);
 
+/// RCON cooldown. Required period between RCON invocations.
+///
+/// The Minecraft RCON implementation is very broken and brittle, this is used in the hopes to
+/// improve reliability.
+#[cfg(feature = "rcon")]
+const RCON_COOLDOWN: Duration = Duration::from_secs(15);
+
 /// Server state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum State {
@@ -91,6 +98,10 @@ pub struct Server {
     ///
     /// Used as starting/stopping timeout.
     kill_at: RwLock<Option<Instant>>,
+
+    /// Last time server was stopped over RCON.
+    #[cfg(feature = "rcon")]
+    rcon_last_stop: Mutex<Option<Instant>>,
 }
 
 impl Server {
@@ -219,16 +230,9 @@ impl Server {
 
     /// Stop running server.
     ///
-    /// This requires the server PID to be known.
+    /// This will attempt to stop the server with all available methods.
     #[allow(unused_variables)]
     pub async fn stop(&self, config: &Config) -> bool {
-        // We must have a running process
-        let has_process = self.pid.lock().unwrap().is_some();
-        if !has_process {
-            debug!(target: "lazymc", "Tried to stop server, while no PID is known");
-            return false;
-        }
-
         // Try to stop through RCON if started
         #[cfg(feature = "rcon")]
         if self.state() == State::Started && stop_server_rcon(config, self).await {
@@ -337,6 +341,8 @@ impl Default for Server {
             last_active: Default::default(),
             keep_online_until: Default::default(),
             kill_at: Default::default(),
+            #[cfg(feature = "rcon")]
+            rcon_last_stop: Default::default(),
         }
     }
 }
@@ -419,6 +425,18 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
         return false;
     }
 
+    // Ensure RCON has cooled down
+    let rcon_cooled_down = server
+        .rcon_last_stop
+        .lock()
+        .unwrap()
+        .map(|t| t.elapsed() >= RCON_COOLDOWN)
+        .unwrap_or(true);
+    if !rcon_cooled_down {
+        debug!(target: "lazymc", "Not using RCON to stop server, in cooldown, used too recently");
+        return false;
+    }
+
     // RCON address
     let mut addr = config.server.address;
     addr.set_port(config.rcon.port);
@@ -439,8 +457,12 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
         return false;
     }
 
-    // Set server to stopping state
-    // TODO: set before stop command, revert state on failure
+    // Set server to stopping state, update last RCON time
+    server
+        .rcon_last_stop
+        .lock()
+        .unwrap()
+        .replace(Instant::now());
     server.update_state(State::Stopping, config);
 
     // Gracefully close connection
