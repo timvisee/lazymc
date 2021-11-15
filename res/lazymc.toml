@@ -61,21 +61,29 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
 [join]
 # Methods to use to occupy a client on join while the server is starting.
-# Methods are used in order if supported, and can be configured in the sections below.
-# If no method is set, the client is disconnected without a message.
+# Read about all methods and configure them below.
+# Methods are used in-order, if none is set, the client disconnects without a message.
 #methods = [
 #    "hold",
 #    "kick",
 #]
 
 [join.kick]
+# Kick occupation method.
+# Instantly kicks a client with a message.
+
 # Message shown when client is kicked while server is starting/stopping.
 #starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
 #stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
 
 [join.hold]
+# Hold occupation method.
+# Holds back a joining client while the server is started until it is ready.
+# 'Connecting the server...' is shown on the client while it's held back.
+# If the server starts fast enough, the client won't notice it was sleeping at all.
+# This works for a limited time of 30 seconds, after which the Minecraft client times out.
+
 # Hold client for number of seconds on connect while server starts.
-# If timeout is reached, the next join method is attempted.
 # Keep below Minecraft timeout of 30 seconds.
 #timeout = 25
 
