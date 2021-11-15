@@ -31,10 +31,13 @@ pub async fn serve(
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
-    // Incoming buffer and packet holding queue
+    // Incoming buffer
     let mut buf = BytesMut::new();
-    let may_hold = config.join.methods.contains(&Method::Hold);
-    let mut hold_queue = BytesMut::new();
+
+    // Remember inbound packets, used for client holding and forwarding
+    let remember_inbound = config.join.methods.contains(&Method::Hold)
+        || config.join.methods.contains(&Method::Forward);
+    let mut inbound_history = BytesMut::new();
 
     loop {
         // Read packet from stream
@@ -71,8 +74,8 @@ pub async fn serve(
             client.set_state(new_state);
 
             // If login handshake and holding is enabled, hold packets
-            if new_state == ClientState::Login && may_hold {
-                hold_queue.extend(raw);
+            if new_state == ClientState::Login && remember_inbound {
+                inbound_history.extend(raw);
             }
 
             continue;
@@ -123,26 +126,6 @@ pub async fn serve(
             // Use join occupy methods
             for method in &config.join.methods {
                 match method {
-                    // Hold method, hold client connection while server starts
-                    Method::Hold => {
-                        trace!(target: "lazymc", "Using hold method to occupy joining client");
-
-                        // Server must be starting
-                        if server.state() != State::Starting {
-                            continue;
-                        }
-
-                        // Hold login packet and remaining read bytes
-                        hold_queue.extend(&raw);
-                        hold_queue.extend(buf.split_off(0));
-
-                        // Start holding
-                        if hold(&config, &server).await? {
-                            service::server::route_proxy_queue(inbound, config, hold_queue);
-                            return Ok(());
-                        }
-                    }
-
                     // Kick method, immediately kick client
                     Method::Kick => {
                         trace!(target: "lazymc", "Using kick method to occupy joining client");
@@ -156,6 +139,47 @@ pub async fn serve(
                         };
                         kick(msg, &mut writer).await?;
                         break;
+                    }
+
+                    // Hold method, hold client connection while server starts
+                    Method::Hold => {
+                        trace!(target: "lazymc", "Using hold method to occupy joining client");
+
+                        // Server must be starting
+                        if server.state() != State::Starting {
+                            continue;
+                        }
+
+                        // Hold login packet and remaining read bytes
+                        inbound_history.extend(&raw);
+                        inbound_history.extend(buf.split_off(0));
+
+                        // Start holding
+                        if hold(&config, &server).await? {
+                            service::server::route_proxy_queue(inbound, config, inbound_history);
+                            return Ok(());
+                        }
+                    }
+
+                    // Forward method, forward client connection while server starts
+                    Method::Forward => {
+                        trace!(target: "lazymc", "Using forward method to occupy joining client");
+
+                        // Hold login packet and remaining read bytes
+                        inbound_history.extend(&raw);
+                        inbound_history.extend(buf.split_off(0));
+
+                        // Forward client
+                        debug!(target: "lazymc", "Forwarding client to {:?}!", config.join.forward.address);
+
+                        service::server::route_proxy_address_queue(
+                            inbound,
+                            config.join.forward.address,
+                            inbound_history,
+                        );
+                        return Ok(());
+
+                        // TODO: do not consume client here, allow other join method on fail
                     }
                 }
             }

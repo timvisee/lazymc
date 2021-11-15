@@ -87,6 +87,16 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Keep below Minecraft timeout of 30 seconds.
 #timeout = 25
 
+[join.forward]
+# Forward occupation method.
+# Instantly forwards (proxies) the client to a different address.
+# You may need to configure target server for it, such as allowing proxies.
+# Consumes client, not allowing other join methods afterwards.
+
+# IP and port to forward to.
+# Forwarded-to server will receive original client handshake and login request as received by lazymc.
+#address = "127.0.0.1:25565"
+
 [lockout]
 # Enable to prevent everybody from connecting through lazymc. Instantly kicks player.
 #enabled = false

@@ -230,8 +230,14 @@ impl Default for Motd {
 #[derive(Debug, Deserialize, Copy, Clone, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
-    Hold,
+    /// Kick client with message.
     Kick,
+
+    /// Hold client connection until server is ready.
+    Hold,
+
+    /// Forward connection to another host.
+    Forward,
 }
 
 /// Join configuration.
@@ -248,6 +254,10 @@ pub struct Join {
     /// Join hold configuration.
     #[serde(default)]
     pub hold: JoinHold,
+
+    /// Join forward configuration.
+    #[serde(default)]
+    pub forward: JoinForward,
 }
 
 impl Default for Join {
@@ -256,6 +266,7 @@ impl Default for Join {
             methods: vec![Method::Hold, Method::Kick],
             kick: Default::default(),
             hold: Default::default(),
+            forward: Default::default(),
         }
     }
 }
@@ -291,6 +302,22 @@ pub struct JoinHold {
 impl Default for JoinHold {
     fn default() -> Self {
         Self { timeout: 25 }
+    }
+}
+
+/// Join forward configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct JoinForward {
+    /// IP and port to forward to.
+    pub address: SocketAddr,
+}
+
+impl Default for JoinForward {
+    fn default() -> Self {
+        Self {
+            address: "127.0.0.1:25565".parse().unwrap(),
+        }
     }
 }
 

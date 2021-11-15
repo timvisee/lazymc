@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use bytes::BytesMut;
@@ -103,9 +104,15 @@ fn route_proxy(inbound: TcpStream, config: Arc<Config>) {
 /// Route inbound TCP stream to proxy with queued data, spawning a new task.
 #[inline]
 pub fn route_proxy_queue(inbound: TcpStream, config: Arc<Config>, queue: BytesMut) {
+    route_proxy_address_queue(inbound, config.server.address, queue);
+}
+
+/// Route inbound TCP stream to proxy with given address and queued data, spawning a new task.
+#[inline]
+pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: BytesMut) {
     // When server is online, proxy all
     let service = async move {
-        proxy::proxy_with_queue(inbound, config.server.address, &queue)
+        proxy::proxy_with_queue(inbound, addr, &queue)
             .map(|r| {
                 if let Err(err) = r {
                     warn!(target: "lazymc", "Failed to proxy: {}", err);
