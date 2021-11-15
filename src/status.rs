@@ -104,6 +104,18 @@ pub async fn serve(
                 .ok()
                 .map(|p| p.name);
 
+            // Kick if lockout is enabled
+            if config.lockout.enabled {
+                match username {
+                    Some(username) => {
+                        info!(target: "lazymc", "Kicked '{}' because lockout is enabled", username)
+                    }
+                    None => info!(target: "lazymc", "Kicked player because lockout is enabled"),
+                }
+                kick(&config.lockout.message, &mut writer).await?;
+                break;
+            }
+
             // Start server if not starting yet
             Server::start(config.clone(), server.clone(), username).await;
 

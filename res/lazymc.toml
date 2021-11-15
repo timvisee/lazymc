@@ -67,6 +67,13 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 #login_starting = "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute."
 #login_stopping = "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again."
 
+[lockout]
+# Enable to prevent everybody from connecting through lazymc. Instantly kicks player.
+#enabled = false
+
+# Kick players with following message.
+#message = "Server is closed §7☠§r\n\nPlease try to reconnect in a minute."
+
 [rcon]
 # Enable sleeping server through RCON.
 # Must be enabled on Windows.

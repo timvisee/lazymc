@@ -73,6 +73,10 @@ pub struct Config {
     #[serde(default)]
     pub messages: Messages,
 
+    /// Lockout feature.
+    #[serde(default)]
+    pub lockout: Lockout,
+
     /// RCON configuration.
     #[serde(default)]
     pub rcon: Rcon,
@@ -212,6 +216,26 @@ impl Default for Messages {
             use_server_motd: false,
             login_starting: "Server is starting... §c♥§r\n\nThis may take some time.\n\nPlease try to reconnect in a minute.".into(),
             login_stopping: "Server is going to sleep... §7☠§r\n\nPlease try to reconnect in a minute to wake it again.".into(),
+        }
+    }
+}
+
+/// Lockout configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Lockout {
+    /// Enable to prevent everybody from connecting through lazymc. Instantly kicks player.
+    pub enabled: bool,
+
+    /// Kick players with following message.
+    pub message: String,
+}
+
+impl Default for Lockout {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            message: "Server is closed §7☠§r\n\nPlease come back another time.".into(),
         }
     }
 }

@@ -41,6 +41,7 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 - Automatically manages `server.properties` (host, port and RCON settings)
 - Graceful server sleep/shutdown through RCON (with `SIGTERM` fallback on Linux/Unix)
 - Restart server on crash
+- Lockout mode
 
 ## Requirements
 

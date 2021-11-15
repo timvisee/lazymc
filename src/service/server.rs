@@ -38,6 +38,13 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         config.public.address, config.server.address,
     );
 
+    if config.lockout.enabled {
+        warn!(
+            target: "lazymc",
+            "Lockout mode is enabled, nobody will be able to connect through the proxy",
+        );
+    }
+
     // Spawn server monitor and signal handler services
     tokio::spawn(service::monitor::service(config.clone(), server.clone()));
     tokio::spawn(service::signal::service(config.clone(), server.clone()));
@@ -58,7 +65,8 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
 /// Route inbound TCP stream to correct service, spawning a new task.
 #[inline]
 fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
-    if server.state() == server::State::Started {
+    let should_proxy = server.state() == server::State::Started && !config.lockout.enabled;
+    if should_proxy {
         route_proxy(inbound, config)
     } else {
         route_status(inbound, config, server)
