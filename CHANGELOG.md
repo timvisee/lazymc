@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2021-11-15)
+
+- Fix binary release
+
 ## 0.1.2 (2021-11-15)
 
 - Add Linux ARMv7 and aarch64 releases
