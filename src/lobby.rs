@@ -30,20 +30,13 @@ use crate::proxy;
 use crate::server::{Server, State};
 
 // TODO: remove this before releasing feature
-pub const USE_LOBBY: bool = true;
 pub const DONT_START_SERVER: bool = false;
-const STARTING_BANNER: &str = "§2Server is starting\n§7⌛ Please wait...";
-const JOIN_SOUND: bool = true;
-const JOIN_SOUND_NAME: &str = "block.note_block.chime";
 
 /// Interval to send keep-alive packets at.
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Auto incrementing ID source for keep alive packets.
 const KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
-
-/// Lobby clients may wait a maximum of 10 minutes for the server to come online.
-const SERVER_WAIT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
 /// Timeout for creating new server connection for lobby client.
 const SERVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(2 * 60);
@@ -129,18 +122,17 @@ pub async fn serve(
             send_lobby_play_packets(&mut writer, &server).await?;
 
             // Wait for server to come online, then set up new connection to it
-            stage_wait(server.clone(), &mut writer).await?;
+            stage_wait(&server, &config, &mut writer).await?;
             let (mut outbound, mut server_buf) = connect_to_server(client_info, &config).await?;
 
             // Grab join game packet from server
             let join_game = wait_for_server_join_game(&mut outbound, &mut server_buf).await?;
 
-            // Reset lobby title, player position and play sound effect
+            // Reset lobby title
             send_lobby_title(&mut writer, "").await?;
-            if JOIN_SOUND {
-                send_lobby_player_pos(&mut writer).await?;
-                send_lobby_sound_effect(&mut writer).await?;
-            }
+
+            // Play ready sound if configured
+            play_lobby_ready_sound(&mut writer, &config).await?;
 
             // Wait a second because Notchian servers are slow
             // See: https://wiki.vg/Protocol#Login_Success
@@ -201,6 +193,23 @@ async fn respond_login_success(
 
     let response = RawPacket::new(proto::packets::login::CLIENT_LOGIN_SUCCESS, data).encode()?;
     writer.write_all(&response).await.map_err(|_| ())?;
+
+    Ok(())
+}
+
+/// Play lobby ready sound effect if configured.
+async fn play_lobby_ready_sound(writer: &mut WriteHalf<'_>, config: &Config) -> Result<(), ()> {
+    if let Some(sound_name) = config.join.lobby.ready_sound.as_ref() {
+        // Must not be empty string
+        if sound_name.trim().is_empty() {
+            warn!(target: "lazymc::lobby", "Lobby ready sound effect is an empty string, you should remove the configuration item instead");
+            return Ok(());
+        }
+
+        // Play sound effect
+        send_lobby_player_pos(writer).await?;
+        send_lobby_sound_effect(writer, sound_name).await?;
+    }
 
     Ok(())
 }
@@ -405,9 +414,9 @@ async fn send_lobby_title(writer: &mut WriteHalf<'_>, text: &str) -> Result<(), 
 }
 
 /// Send lobby ready sound effect to client.
-async fn send_lobby_sound_effect(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+async fn send_lobby_sound_effect(writer: &mut WriteHalf<'_>, sound_name: &str) -> Result<(), ()> {
     let packet = NamedSoundEffect {
-        sound_name: JOIN_SOUND_NAME.into(),
+        sound_name: sound_name.into(),
         sound_category: 0,
         effect_pos_x: 0,
         effect_pos_y: 0,
@@ -453,7 +462,7 @@ async fn send_respawn_from_join(writer: &mut WriteHalf<'_>, join_game: JoinGame)
 /// An infinite keep-alive loop.
 ///
 /// This will keep sending keep-alive and title packets to the client until it is dropped.
-async fn keep_alive_loop(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+async fn keep_alive_loop(writer: &mut WriteHalf<'_>, config: &Config) -> Result<(), ()> {
     let mut interval = time::interval(KEEP_ALIVE_INTERVAL);
 
     loop {
@@ -463,7 +472,7 @@ async fn keep_alive_loop(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 
         // Send keep alive and title packets
         send_keep_alive(writer).await?;
-        send_lobby_title(writer, STARTING_BANNER).await?;
+        send_lobby_title(writer, &config.join.lobby.message).await?;
     }
 }
 
@@ -472,17 +481,21 @@ async fn keep_alive_loop(writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 /// In this stage we wait for the server to come online.
 ///
 /// During this stage we keep sending keep-alive and title packets to the client to keep it active.
-async fn stage_wait<'a>(server: Arc<Server>, writer: &mut WriteHalf<'a>) -> Result<(), ()> {
+async fn stage_wait<'a>(
+    server: &Server,
+    config: &Config,
+    writer: &mut WriteHalf<'a>,
+) -> Result<(), ()> {
     select! {
-        a = keep_alive_loop(writer) => a,
-        b = wait_for_server(server) => b,
+        a = keep_alive_loop(writer, config) => a,
+        b = wait_for_server(server, config) => b,
     }
 }
 
 /// Wait for the server to come online.
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
-async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
+async fn wait_for_server<'a>(server: &Server, config: &Config) -> Result<(), ()> {
     debug!(target: "lazymc::lobby", "Waiting on server to come online...");
 
     // A task to wait for suitable server state
@@ -514,7 +527,8 @@ async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
     };
 
     // Wait for server state with timeout
-    match time::timeout(SERVER_WAIT_TIMEOUT, task_wait).await {
+    let timeout = Duration::from_secs(config.join.lobby.timeout as u64);
+    match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
         Ok(true) => {
             debug!(target: "lazymc::lobby", "Server ready for lobby client");
@@ -526,7 +540,7 @@ async fn wait_for_server<'a>(server: Arc<Server>) -> Result<(), ()> {
 
         // Timeout reached, disconnect
         Err(_) => {
-            warn!(target: "lazymc::lobby", "Lobby client waiting for server to come online reached timeout of {}s", SERVER_WAIT_TIMEOUT.as_secs());
+            warn!(target: "lazymc::lobby", "Lobby client waiting for server to come online reached timeout of {}s", timeout.as_secs());
         }
     }
 

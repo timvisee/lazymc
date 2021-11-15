@@ -97,6 +97,33 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Forwarded-to server will receive original client handshake and login request as received by lazymc.
 #address = "127.0.0.1:25565"
 
+[join.lobby]
+# Lobby occupation method.
+# The client joins a fake lobby server with an empty world, floating in space.
+# A message is overlayed on screen to notify the server is starting.
+# The client will be teleported to the real server once it is ready.
+# This may keep the client occupied forever if no timeout is set.
+# Consumes client, not allowing other join methods afterwards.
+
+# !!! WARNING !!!
+# This is highly experimental and unstable.
+# This may break the game and crash clients.
+# Don't enable this unless you know what you're doing.
+#
+# - Only works with offline mode
+# - Only works with server packet compression disabled
+# - Only works with vanilla Minecraft clients, does not work with modded
+# - Only tested with Minecraft 1.17.1
+
+# Maxiumum time in seconds in the lobby while the server starts.
+#timeout = 600
+
+# Message banner in lobby shown to client.
+#message = "§2Server is starting\n§7⌛ Please wait..."
+
+# Sound effect to play when server is ready.
+#ready_sound = "block.note_block.chime"
+
 [lockout]
 # Enable to prevent everybody from connecting through lazymc. Instantly kicks player.
 #enabled = false
@@ -123,5 +150,5 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
 [config]
 # lazymc version this configuration is for.
-# Do not change unless you know what you're doing.
+# Don't change unless you know what you're doing.
 version = "0.2.0"

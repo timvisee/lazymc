@@ -238,6 +238,9 @@ pub enum Method {
 
     /// Forward connection to another host.
     Forward,
+
+    /// Keep client in temporary fake lobby until server is ready.
+    Lobby,
 }
 
 /// Join configuration.
@@ -258,6 +261,10 @@ pub struct Join {
     /// Join forward configuration.
     #[serde(default)]
     pub forward: JoinForward,
+
+    /// Join lobby configuration.
+    #[serde(default)]
+    pub lobby: JoinLobby,
 }
 
 impl Default for Join {
@@ -267,6 +274,7 @@ impl Default for Join {
             kick: Default::default(),
             hold: Default::default(),
             forward: Default::default(),
+            lobby: Default::default(),
         }
     }
 }
@@ -317,6 +325,29 @@ impl Default for JoinForward {
     fn default() -> Self {
         Self {
             address: "127.0.0.1:25565".parse().unwrap(),
+        }
+    }
+}
+/// Join lobby configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct JoinLobby {
+    /// Hold client in lobby for number of seconds on connect while server starts.
+    pub timeout: u32,
+
+    /// Message banner in lobby shown to client.
+    pub message: String,
+
+    /// Sound effect to play when server is ready.
+    pub ready_sound: Option<String>,
+}
+
+impl Default for JoinLobby {
+    fn default() -> Self {
+        Self {
+            timeout: 10 * 60,
+            message: "§2Server is starting\n§7⌛ Please wait...".into(),
+            ready_sound: Some("block.note_block.chime".into()),
         }
     }
 }

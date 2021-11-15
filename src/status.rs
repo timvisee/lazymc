@@ -140,22 +140,6 @@ pub async fn serve(
                 Server::start(config.clone(), server.clone(), username).await;
             }
 
-            // Lobby mode
-            if lobby::USE_LOBBY {
-                // // Hold login packet and remaining read bytes
-                // hold_queue.extend(raw);
-                // hold_queue.extend(buf.split_off(0));
-
-                // Build queue with login packet and any additionally received
-                let mut queue = BytesMut::with_capacity(raw.len() + buf.len());
-                queue.extend(raw);
-                queue.extend(buf.split_off(0));
-
-                // Start lobby
-                lobby::serve(client, client_info, inbound, config, server, queue).await?;
-                return Ok(());
-            }
-
             // Use join occupy methods
             for method in &config.join.methods {
                 match method {
@@ -210,6 +194,22 @@ pub async fn serve(
                             config.join.forward.address,
                             inbound_history,
                         );
+                        return Ok(());
+
+                        // TODO: do not consume client here, allow other join method on fail
+                    }
+
+                    // Lobby method, keep client in lobby while server starts
+                    Method::Lobby => {
+                        trace!(target: "lazymc", "Using lobby method to occupy joining client");
+
+                        // Build queue with login packet and any additionally received
+                        let mut queue = BytesMut::with_capacity(raw.len() + buf.len());
+                        queue.extend(raw);
+                        queue.extend(buf.split_off(0));
+
+                        // Start lobby
+                        lobby::serve(client, client_info, inbound, config, server, queue).await?;
                         return Ok(());
 
                         // TODO: do not consume client here, allow other join method on fail
