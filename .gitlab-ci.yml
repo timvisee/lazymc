@@ -43,6 +43,7 @@ before_script:
     <<: *rust-build-cache
   script:
     - cargo check --verbose
+    - cargo check --no-default-features --verbose
     - cargo check --no-default-features --features rcon --verbose
 check:
   <<: *check-base
@@ -228,6 +229,8 @@ test-cargo-x86_64-linux-gnu:
     <<: *rust-build-cache
   script:
     - cargo test --locked --verbose
+    - cargo test --locked --no-default-features --verbose
+    - cargo test --locked --no-default-features --features rcon --verbose
 
 # Run the unit tests through Cargo on Windows
 test-cargo-x86_64-windows:
@@ -240,6 +243,7 @@ test-cargo-x86_64-windows:
   <<: *before_script-windows
   script:
     - cargo test --locked --verbose
+    - cargo test --locked --no-default-features --features rcon --verbose
 
 # Release binaries on GitLab as generic package
 release-gitlab-generic-package:
