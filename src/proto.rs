@@ -79,8 +79,7 @@ pub mod packets {
 
 /// Client state.
 ///
-/// Note: this does not keep track of compression/encryption states because packets are never
-/// inspected when these modes are enabled.
+/// Note: this does not keep track of encryption states.
 #[derive(Debug)]
 pub struct Client {
     /// Current client state.

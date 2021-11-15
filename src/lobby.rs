@@ -29,9 +29,6 @@ use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::proxy;
 use crate::server::{Server, State};
 
-// TODO: remove this before releasing feature
-pub const DONT_START_SERVER: bool = false;
-
 /// Interval to send keep-alive packets at.
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 

@@ -135,10 +135,8 @@ pub async fn serve(
                 break;
             }
 
-            if !lobby::DONT_START_SERVER {
-                // Start server if not starting yet
-                Server::start(config.clone(), server.clone(), username).await;
-            }
+            // Start server if not starting yet
+            Server::start(config.clone(), server.clone(), username).await;
 
             // Use join occupy methods
             for method in &config.join.methods {
