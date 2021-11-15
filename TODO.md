@@ -17,6 +17,12 @@
 
 ## Experiment
 
-- Lobby method: let players connect with an emulated empty server (like 2b2t's
-  queue), redirect them when the server started.
 - `io_uring` on Linux for efficient proxying (see `tokio-uring`)
+
+## Lobby join method
+
+- add support for more Minecraft versions (with changed protocols)
+- support online mode (encryption)
+- hold back packets (whitelist), forward to server at connect before joining
+- add support for forge (emulate mod list communication)
+- on login plugin request during login state, respond with empty payload, not supported
