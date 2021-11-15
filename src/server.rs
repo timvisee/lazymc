@@ -443,6 +443,9 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
     // TODO: set before stop command, revert state on failure
     server.update_state(State::Stopping, config);
 
+    // Gracefully close connection
+    rcon.close().await;
+
     true
 }
 
