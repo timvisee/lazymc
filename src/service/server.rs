@@ -44,7 +44,7 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
 
     // Initiate server start
     if config.server.wake_on_start {
-        Server::start(config.clone(), server.clone(), None);
+        Server::start(config.clone(), server.clone(), None).await;
     }
 
     // Route all incomming connections

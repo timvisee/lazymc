@@ -79,7 +79,7 @@ pub async fn serve(
 
         // Hijack server status packet
         if client_state == ClientState::Status && packet.id == proto::STATUS_PACKET_ID_STATUS {
-            let server_status = server_status(&config, &server);
+            let server_status = server_status(&config, &server).await;
             let packet = StatusResponse { server_status };
 
             let mut data = Vec::new();
@@ -105,7 +105,7 @@ pub async fn serve(
                 .map(|p| p.name);
 
             // Start server if not starting yet
-            Server::start(config.clone(), server.clone(), username);
+            Server::start(config.clone(), server.clone(), username).await;
 
             // Hold client if enabled and starting
             if config.time.hold() && server.state() == State::Starting {
@@ -241,8 +241,8 @@ async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
 }
 
 /// Build server status object to respond to client with.
-fn server_status(config: &Config, server: &Server) -> ServerStatus {
-    let status = server.status();
+async fn server_status(config: &Config, server: &Server) -> ServerStatus {
+    let status = server.status().await;
 
     // Select version and player max from last known server status
     let (version, max) = match status.as_ref() {

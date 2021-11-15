@@ -43,10 +43,10 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
         let status = poll_server(&config, &server, addr).await;
         match status {
             // Got status, update
-            Ok(Some(status)) => server.update_status(&config, Some(status)),
+            Ok(Some(status)) => server.update_status(&config, Some(status)).await,
 
             // Error, reset status
-            Err(_) => server.update_status(&config, None),
+            Err(_) => server.update_status(&config, None).await,
 
             // Didn't get status, but ping fallback worked, leave as-is, show warning
             Ok(None) => {
@@ -55,13 +55,13 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
         }
 
         // Sleep server when it's bedtime
-        if server.should_sleep(&config) {
+        if server.should_sleep(&config).await {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
             server.stop(&config).await;
         }
 
         // Check whether we should force kill server
-        if server.should_kill() {
+        if server.should_kill().await {
             error!(target: "lazymc::montior", "Force killing server, took too long to start or stop");
             if !server.force_kill().await {
                 warn!(target: "lazymc", "Failed to force kill server");
