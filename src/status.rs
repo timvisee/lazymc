@@ -16,6 +16,7 @@ use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::*;
+#[cfg(feature = "lobby")]
 use crate::lobby;
 use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
 use crate::server::{self, Server, State};
@@ -198,6 +199,7 @@ pub async fn serve(
                     }
 
                     // Lobby method, keep client in lobby while server starts
+                    #[cfg(feature = "lobby")]
                     Method::Lobby => {
                         trace!(target: "lazymc", "Using lobby method to occupy joining client");
 
@@ -209,8 +211,13 @@ pub async fn serve(
                         // Start lobby
                         lobby::serve(client, client_info, inbound, config, server, queue).await?;
                         return Ok(());
-
                         // TODO: do not consume client here, allow other join method on fail
+                    }
+
+                    // Lobby method, keep client in lobby while server starts
+                    #[cfg(not(feature = "lobby"))]
+                    Method::Lobby => {
+                        error!(target: "lazymc", "Lobby join method not supported in this lazymc build");
                     }
                 }
             }

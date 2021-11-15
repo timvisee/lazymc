@@ -113,6 +113,7 @@ impl Client {
     }
 
     /// Set compression value.
+    #[allow(unused)]
     pub fn set_compression(&self, threshold: i32) {
         trace!(target: "lazymc", "Client now uses compression threshold of {}", threshold);
         self.compression.store(threshold, Ordering::Relaxed);
@@ -144,6 +145,7 @@ pub enum ClientState {
     Login,
 
     /// State to play on the server.
+    #[allow(unused)]
     Play,
 }
 
