@@ -62,7 +62,7 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 [join]
 # Methods to use to occupy a client on join while the server is starting.
 # Read about all methods and configure them below.
-# Methods are used in-order, if none is set, the client disconnects without a message.
+# Methods are used in order, if none is set, the client disconnects without a message.
 #methods = [
 #    "hold",
 #    "kick",
@@ -94,7 +94,7 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Consumes client, not allowing other join methods afterwards.
 
 # IP and port to forward to.
-# Forwarded-to server will receive original client handshake and login request as received by lazymc.
+# The target server will receive original client handshake and login request as received by lazymc.
 #address = "127.0.0.1:25565"
 
 [join.lobby]
@@ -106,7 +106,7 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Consumes client, not allowing other join methods afterwards.
 
 # !!! WARNING !!!
-# This is highly experimental and unstable.
+# This is highly experimental, incomplete and unstable.
 # This may break the game and crash clients.
 # Don't enable this unless you know what you're doing.
 #
@@ -114,7 +114,7 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # - Only works with vanilla Minecraft clients, does not work with modded
 # - Only tested with Minecraft 1.17.1
 
-# Maxiumum time in seconds in the lobby while the server starts.
+# Maximum time in seconds in the lobby while the server starts.
 #timeout = 600
 
 # Message banner in lobby shown to client.

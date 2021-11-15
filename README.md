@@ -40,6 +40,7 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
   - Hold: hold clients when server starts, relay when ready, without them noticing
   - Kick: kick clients when server starts, with a starting message
   - Forward: forward client to another IP when server starts
+  - _Lobby: keep client in emulated server with lobby world, teleport to real server when ready ([experimental*](./docs/join-method-lobby.md))_
 - Customizable MOTD and login messages
 - Automatically manages `server.properties` (host, port and RCON settings)
 - Graceful server sleep/shutdown through RCON (with `SIGTERM` fallback on Linux/Unix)
