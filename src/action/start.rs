@@ -5,6 +5,7 @@ use clap::ArgMatches;
 
 use crate::config::{self, Config};
 use crate::mc::server_properties;
+use crate::proto;
 use crate::service;
 
 /// RCON randomized password length.
@@ -139,6 +140,14 @@ fn rewrite_server_properties(config: &Config) {
     // If connecting to server over non-loopback address, disable proxy blocking
     if !config.server.address.ip().is_loopback() {
         changes.extend([("prevent-proxy-connections", "false".into())]);
+    }
+
+    // Update network compression threshold for lobby mode
+    if config.join.methods.contains(&config::Method::Lobby) {
+        changes.extend([(
+            "network-compression-threshold",
+            proto::COMPRESSION_THRESHOLD.to_string(),
+        )]);
     }
 
     // Add RCON configuration

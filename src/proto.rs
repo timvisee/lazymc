@@ -1,6 +1,11 @@
+use std::io::prelude::*;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 use bytes::BytesMut;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use tokio::io;
 use tokio::io::AsyncReadExt;
 use tokio::net::tcp::ReadHalf;
@@ -23,6 +28,10 @@ pub const PROTO_DEFAULT_VERSION: &str = "1.17.1";
 /// Should be kept up-to-date with latest supported Minecraft version by lazymc.
 pub const PROTO_DEFAULT_PROTOCOL: u32 = 756;
 
+/// Compression threshold to use.
+// TODO: read this from server.properties instead
+pub const COMPRESSION_THRESHOLD: i32 = 256;
+
 /// Minecraft protocol packet IDs.
 #[allow(unused)]
 pub mod packets {
@@ -38,9 +47,10 @@ pub mod packets {
     }
 
     pub mod login {
-        pub const CLIENT_DISCONNECT: i32 = 0;
-        pub const CLIENT_LOGIN_SUCCESS: i32 = 2;
-        pub const SERVER_LOGIN_START: i32 = 0;
+        pub const CLIENT_DISCONNECT: i32 = 0x00;
+        pub const CLIENT_LOGIN_SUCCESS: i32 = 0x02;
+        pub const CLIENT_SET_COMPRESSION: i32 = 0x03;
+        pub const SERVER_LOGIN_START: i32 = 0x00;
     }
 
     pub mod play {
@@ -68,10 +78,15 @@ pub mod packets {
 ///
 /// Note: this does not keep track of compression/encryption states because packets are never
 /// inspected when these modes are enabled.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Client {
     /// Current client state.
     pub state: Mutex<ClientState>,
+
+    /// Compression state.
+    ///
+    /// 0 or positive if enabled, negative if disabled.
+    pub compression: AtomicI32,
 }
 
 impl Client {
@@ -83,6 +98,31 @@ impl Client {
     /// Set client state.
     pub fn set_state(&self, state: ClientState) {
         *self.state.lock().unwrap() = state;
+    }
+
+    /// Get compression threshold.
+    pub fn compressed(&self) -> i32 {
+        self.compression.load(Ordering::Relaxed)
+    }
+
+    /// Whether compression is used.
+    pub fn is_compressed(&self) -> bool {
+        self.compressed() >= 0
+    }
+
+    /// Set compression value.
+    pub fn set_compression(&self, threshold: i32) {
+        trace!(target: "lazymc", "Client now uses compression threshold of {}", threshold);
+        self.compression.store(threshold, Ordering::Relaxed);
+    }
+}
+
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            state: Default::default(),
+            compression: AtomicI32::new(-1),
+        }
     }
 }
 
@@ -166,12 +206,8 @@ impl RawPacket {
         Self { id, data }
     }
 
-    /// Decode packet from raw buffer.
-    pub fn decode(mut buf: &[u8]) -> Result<Self, ()> {
-        // Read length
-        let (read, len) = types::read_var_int(buf)?;
-        buf = &buf[read..][..len as usize];
-
+    /// Read packet ID from buffer, use remaining buffer as data.
+    fn read_packet_id_data(mut buf: &[u8]) -> Result<Self, ()> {
         // Read packet ID, select buf
         let (read, packet_id) = types::read_var_int(buf)?;
         buf = &buf[read..];
@@ -179,8 +215,94 @@ impl RawPacket {
         Ok(Self::new(packet_id, buf.to_vec()))
     }
 
+    /// Decode packet from raw buffer.
+    ///
+    /// This decodes both compressed and uncompressed packets based on the client threshold
+    /// preference.
+    pub fn decode(client: &Client, mut buf: &[u8]) -> Result<Self, ()> {
+        // Read length
+        let (read, len) = types::read_var_int(buf)?;
+        buf = &buf[read..][..len as usize];
+
+        // If no compression is used, read remaining packet ID and data
+        if !client.is_compressed() {
+            // Read packet ID and data
+            return Self::read_packet_id_data(buf);
+        }
+
+        // Read data length
+        let (read, data_len) = types::read_var_int(buf)?;
+        buf = &buf[read..];
+
+        // If data length is zero, the rest is not compressed
+        if data_len == 0 {
+            return Self::read_packet_id_data(buf);
+        }
+
+        // Decompress packet ID and data section
+        let mut decompressed = Vec::with_capacity(data_len as usize);
+        ZlibDecoder::new(buf)
+            .read_to_end(&mut decompressed)
+            .map_err(|err| {
+                error!(target: "lazymc", "Packet decompression error: {}", err);
+            })?;
+
+        // Decompressed data must match length
+        if decompressed.len() != data_len as usize {
+            error!(target: "lazymc", "Decompressed packet has different length than expected ({}b != {}b)", decompressed.len(), data_len);
+            return Err(());
+        }
+
+        // Read decompressed packet ID
+        return Self::read_packet_id_data(&decompressed);
+    }
+
     /// Encode packet to raw buffer.
-    pub fn encode(&self) -> Result<Vec<u8>, ()> {
+    ///
+    /// This compresses packets based on the client threshold preference.
+    pub fn encode(&self, client: &Client) -> Result<Vec<u8>, ()> {
+        let threshold = client.compressed();
+        if threshold >= 0 {
+            self.encode_compressed(threshold)
+        } else {
+            self.encode_uncompressed()
+        }
+    }
+
+    /// Encode compressed packet to raw buffer.
+    fn encode_compressed(&self, threshold: i32) -> Result<Vec<u8>, ()> {
+        // Packet payload: packet ID and data buffer
+        let mut payload = types::encode_var_int(self.id)?;
+        payload.extend_from_slice(&self.data);
+
+        // Determine whether to compress, encode data length bytes
+        let data_len = payload.len() as i32;
+        let compress = data_len > threshold;
+        let mut data_len_bytes =
+            types::encode_var_int(if compress { data_len } else { 0 }).unwrap();
+
+        // Compress payload
+        if compress {
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(&payload).map_err(|err| {
+                error!(target: "lazymc", "Failed to compress packet: {}", err);
+            })?;
+            payload = encoder.finish().map_err(|err| {
+                error!(target: "lazymc", "Failed to compress packet: {}", err);
+            })?;
+        }
+
+        // Encapsulate payload with packet and data length
+        let len = data_len_bytes.len() as i32 + payload.len() as i32;
+        let mut packet = types::encode_var_int(len)?;
+        packet.append(&mut data_len_bytes);
+        packet.append(&mut payload);
+
+        Ok(packet)
+    }
+
+    /// Encode uncompressed packet to raw buffer.
+    fn encode_uncompressed(&self) -> Result<Vec<u8>, ()> {
         let mut data = types::encode_var_int(self.id)?;
         data.extend_from_slice(&self.data);
 
@@ -193,11 +315,8 @@ impl RawPacket {
 }
 
 /// Read raw packet from stream.
-///
-/// Note: this does not support reading compressed/encrypted packets.
-/// We should never need this though, as we're done reading user packets before any of this is
-/// enabled. See: https://wiki.vg/Protocol#Packet_format
 pub async fn read_packet(
+    client: &Client,
     buf: &mut BytesMut,
     stream: &mut ReadHalf<'_>,
 ) -> Result<Option<(RawPacket, Vec<u8>)>, ()> {
@@ -249,9 +368,9 @@ pub async fn read_packet(
         buf.extend(tmp);
     }
 
-    // Parse packet
+    // Parse packet, use full buffer since we'll read the packet length again
     let raw = buf.split_to(consumed + len as usize);
-    let packet = RawPacket::decode(&raw)?;
+    let packet = RawPacket::decode(client, &raw)?;
 
     Ok(Some((packet, raw.to_vec())))
 }

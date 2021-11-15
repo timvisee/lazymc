@@ -628,6 +628,7 @@ dependencies = [
  "colored",
  "derive_builder",
  "dotenv",
+ "flate2",
  "futures",
  "libc",
  "log",

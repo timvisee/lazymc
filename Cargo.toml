@@ -29,6 +29,7 @@ clap = { version = "3.0.0-beta.5", default-features = false, features = [ "std",
 colored = "2.0"
 derive_builder = "0.10"
 dotenv = "0.15"
+flate2 = { version = "1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3", default-features = false }
 log = "0.4"
 minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", branch = "lazymc-v1_17_1" }

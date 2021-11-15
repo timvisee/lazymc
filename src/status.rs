@@ -43,7 +43,7 @@ pub async fn serve(
 
     loop {
         // Read packet from stream
-        let (packet, raw) = match proto::read_packet(&mut buf, &mut reader).await {
+        let (packet, raw) = match proto::read_packet(&client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -100,7 +100,7 @@ pub async fn serve(
             let mut data = Vec::new();
             packet.encode(&mut data).map_err(|_| ())?;
 
-            let response = RawPacket::new(0, data).encode()?;
+            let response = RawPacket::new(0, data).encode(&client)?;
             writer.write_all(&response).await.map_err(|_| ())?;
 
             continue;
@@ -131,7 +131,7 @@ pub async fn serve(
                     }
                     None => info!(target: "lazymc", "Kicked player because lockout is enabled"),
                 }
-                kick(&config.lockout.message, &mut writer).await?;
+                kick(&client, &config.lockout.message, &mut writer).await?;
                 break;
             }
 
@@ -154,7 +154,7 @@ pub async fn serve(
                             | server::State::Started => &config.join.kick.starting,
                             server::State::Stopping => &config.join.kick.stopping,
                         };
-                        kick(msg, &mut writer).await?;
+                        kick(&client, msg, &mut writer).await?;
                         break;
                     }
 
@@ -308,7 +308,7 @@ pub async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
 /// Kick client with a message.
 ///
 /// Should close connection afterwards.
-async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
+async fn kick(client: &Client, msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     let packet = LoginDisconnect {
         reason: Message::new(Payload::text(msg)),
     };
@@ -316,7 +316,7 @@ async fn kick(msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::packets::login::CLIENT_DISCONNECT, data).encode()?;
+    let response = RawPacket::new(proto::packets::login::CLIENT_DISCONNECT, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())
 }
 

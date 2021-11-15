@@ -16,7 +16,7 @@ use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
-use crate::proto::{self, ClientState, RawPacket};
+use crate::proto::{self, Client, ClientState, RawPacket};
 use crate::server::{Server, State};
 
 /// Monitor ping inverval in seconds.
@@ -96,22 +96,29 @@ pub async fn poll_server(
 async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus, ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
-    send_handshake(&mut stream, config, addr).await?;
-    request_status(&mut stream).await?;
-    wait_for_status_timeout(&mut stream).await
+    // Dummy client
+    let client = Client::default();
+
+    send_handshake(&client, &mut stream, config, addr).await?;
+    request_status(&client, &mut stream).await?;
+    wait_for_status_timeout(&client, &mut stream).await
 }
 
 /// Attemp to ping server.
 async fn do_ping(config: &Config, addr: SocketAddr) -> Result<(), ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
-    send_handshake(&mut stream, config, addr).await?;
-    let token = send_ping(&mut stream).await?;
-    wait_for_ping_timeout(&mut stream, token).await
+    // Dummy client
+    let client = Client::default();
+
+    send_handshake(&client, &mut stream, config, addr).await?;
+    let token = send_ping(&client, &mut stream).await?;
+    wait_for_ping_timeout(&client, &mut stream, token).await
 }
 
 /// Send handshake.
 async fn send_handshake(
+    client: &Client,
     stream: &mut TcpStream,
     config: &Config,
     addr: SocketAddr,
@@ -127,7 +134,7 @@ async fn send_handshake(
     handshake.encode(&mut packet).map_err(|_| ())?;
 
     let raw = RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, packet)
-        .encode()
+        .encode(&client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
 
@@ -135,16 +142,16 @@ async fn send_handshake(
 }
 
 /// Send status request.
-async fn request_status(stream: &mut TcpStream) -> Result<(), ()> {
+async fn request_status(client: &Client, stream: &mut TcpStream) -> Result<(), ()> {
     let raw = RawPacket::new(proto::packets::status::SERVER_STATUS, vec![])
-        .encode()
+        .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
     Ok(())
 }
 
 /// Send status request.
-async fn send_ping(stream: &mut TcpStream) -> Result<u64, ()> {
+async fn send_ping(client: &Client, stream: &mut TcpStream) -> Result<u64, ()> {
     let token = rand::thread_rng().gen();
     let ping = PingRequest { time: token };
 
@@ -152,21 +159,21 @@ async fn send_ping(stream: &mut TcpStream) -> Result<u64, ()> {
     ping.encode(&mut packet).map_err(|_| ())?;
 
     let raw = RawPacket::new(proto::packets::status::SERVER_PING, packet)
-        .encode()
+        .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
     Ok(token)
 }
 
 /// Wait for a status response.
-async fn wait_for_status(stream: &mut TcpStream) -> Result<ServerStatus, ()> {
+async fn wait_for_status(client: &Client, stream: &mut TcpStream) -> Result<ServerStatus, ()> {
     // Get stream reader, set up buffer
     let (mut reader, mut _writer) = stream.split();
     let mut buf = BytesMut::new();
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(&mut buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => continue,
@@ -184,22 +191,25 @@ async fn wait_for_status(stream: &mut TcpStream) -> Result<ServerStatus, ()> {
 }
 
 /// Wait for a status response.
-async fn wait_for_status_timeout(stream: &mut TcpStream) -> Result<ServerStatus, ()> {
-    let status = wait_for_status(stream);
+async fn wait_for_status_timeout(
+    client: &Client,
+    stream: &mut TcpStream,
+) -> Result<ServerStatus, ()> {
+    let status = wait_for_status(client, stream);
     tokio::time::timeout(Duration::from_secs(STATUS_TIMEOUT), status)
         .await
         .map_err(|_| ())?
 }
 
 /// Wait for a status response.
-async fn wait_for_ping(stream: &mut TcpStream, token: u64) -> Result<(), ()> {
+async fn wait_for_ping(client: &Client, stream: &mut TcpStream, token: u64) -> Result<(), ()> {
     // Get stream reader, set up buffer
     let (mut reader, mut _writer) = stream.split();
     let mut buf = BytesMut::new();
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(&mut buf, &mut reader).await {
+        let (packet, _raw) = match proto::read_packet(client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => continue,
@@ -223,8 +233,12 @@ async fn wait_for_ping(stream: &mut TcpStream, token: u64) -> Result<(), ()> {
 }
 
 /// Wait for a status response.
-async fn wait_for_ping_timeout(stream: &mut TcpStream, token: u64) -> Result<(), ()> {
-    let status = wait_for_ping(stream, token);
+async fn wait_for_ping_timeout(
+    client: &Client,
+    stream: &mut TcpStream,
+    token: u64,
+) -> Result<(), ()> {
+    let status = wait_for_ping(client, stream, token);
     tokio::time::timeout(Duration::from_secs(PING_TIMEOUT), status)
         .await
         .map_err(|_| ())?
