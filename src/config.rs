@@ -81,14 +81,6 @@ pub struct Config {
     #[serde(default)]
     pub join: Join,
 
-    /// Join kick configuration.
-    #[serde(default)]
-    pub join_kick: JoinKick,
-
-    /// Join hold configuration.
-    #[serde(default)]
-    pub join_hold: JoinHold,
-
     /// Lockout feature.
     #[serde(default)]
     pub lockout: Lockout,
@@ -248,12 +240,22 @@ pub enum Method {
 pub struct Join {
     /// Join methods.
     pub methods: Vec<Method>,
+
+    /// Join kick configuration.
+    #[serde(default)]
+    pub kick: JoinKick,
+
+    /// Join hold configuration.
+    #[serde(default)]
+    pub hold: JoinHold,
 }
 
 impl Default for Join {
     fn default() -> Self {
         Self {
             methods: vec![Method::Hold, Method::Kick],
+            kick: Default::default(),
+            hold: Default::default(),
         }
     }
 }
@@ -284,14 +286,6 @@ impl Default for JoinKick {
 pub struct JoinHold {
     /// Hold client for number of seconds on connect while server starts.
     pub timeout: u32,
-}
-
-impl JoinHold {
-    /// Whether to hold clients.
-    // TODO: remove this
-    pub fn hold(&self) -> bool {
-        self.timeout > 0
-    }
 }
 
 impl Default for JoinHold {

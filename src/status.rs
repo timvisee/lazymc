@@ -33,6 +33,7 @@ pub async fn serve(
 
     // Incoming buffer and packet holding queue
     let mut buf = BytesMut::new();
+    let may_hold = config.join.methods.contains(&Method::Hold);
     let mut hold_queue = BytesMut::new();
 
     loop {
@@ -70,7 +71,7 @@ pub async fn serve(
             client.set_state(new_state);
 
             // If login handshake and holding is enabled, hold packets
-            if new_state == ClientState::Login && config.join_hold.hold() {
+            if new_state == ClientState::Login && may_hold {
                 hold_queue.extend(raw);
             }
 
@@ -119,26 +120,49 @@ pub async fn serve(
             // Start server if not starting yet
             Server::start(config.clone(), server.clone(), username).await;
 
-            // Hold client if enabled and starting
-            if config.join_hold.hold() && server.state() == State::Starting {
-                // Hold login packet and remaining read bytes
-                hold_queue.extend(raw);
-                hold_queue.extend(buf.split_off(0));
+            // Use join occupy methods
+            for method in &config.join.methods {
+                match method {
+                    // Hold method, hold client connection while server starts
+                    Method::Hold => {
+                        trace!(target: "lazymc", "Using hold method to occupy joining client");
 
-                // Start holding
-                hold(inbound, config, server, hold_queue).await?;
-                return Ok(());
+                        // Server must be starting
+                        if server.state() != State::Starting {
+                            continue;
+                        }
+
+                        // Hold login packet and remaining read bytes
+                        hold_queue.extend(&raw);
+                        hold_queue.extend(buf.split_off(0));
+
+                        // Start holding
+                        if hold(&config, &server).await? {
+                            service::server::route_proxy_queue(inbound, config, hold_queue);
+                            return Ok(());
+                        }
+                    }
+
+                    // Kick method, immediately kick client
+                    Method::Kick => {
+                        trace!(target: "lazymc", "Using kick method to occupy joining client");
+
+                        // Select message and kick
+                        let msg = match server.state() {
+                            server::State::Starting
+                            | server::State::Stopped
+                            | server::State::Started => &config.join.kick.starting,
+                            server::State::Stopping => &config.join.kick.stopping,
+                        };
+                        kick(msg, &mut writer).await?;
+                        break;
+                    }
+                }
             }
 
-            // Select message and kick
-            let msg = match server.state() {
-                server::State::Starting | server::State::Stopped | server::State::Started => {
-                    &config.join_kick.starting
-                }
-                server::State::Stopping => &config.join_kick.stopping,
-            };
-            kick(msg, &mut writer).await?;
+            debug!(target: "lazymc", "No method left to occupy joining client, disconnecting");
 
+            // Done occupying client, just disconnect
             break;
         }
 
@@ -160,13 +184,10 @@ pub async fn serve(
 
 /// Hold a client while server starts.
 ///
-/// Relays client to proxy once server is ready.
-pub async fn hold<'a>(
-    mut inbound: TcpStream,
-    config: Arc<Config>,
-    server: Arc<Server>,
-    hold_queue: BytesMut,
-) -> Result<(), ()> {
+/// Returns holding status. `true` if client is held and it should be proxied, `false` it was held
+/// but it timed out.
+#[must_use]
+pub async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
     trace!(target: "lazymc", "Started holding client");
 
     // A task to wait for suitable server state
@@ -205,36 +226,26 @@ pub async fn hold<'a>(
     };
 
     // Wait for server state with timeout
-    let timeout = Duration::from_secs(config.join_hold.timeout as u64);
+    let timeout = Duration::from_secs(config.join.hold.timeout as u64);
     match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
         Ok(true) => {
             info!(target: "lazymc", "Server ready for held client, relaying to server");
-            service::server::route_proxy_queue(inbound, config, hold_queue);
-            return Ok(());
+            return Ok(true);
         }
 
         // Server stopping/stopped, this shouldn't happen, kick
         Ok(false) => {
-            warn!(target: "lazymc", "Server stopping for held client, disconnecting");
-            kick(&config.join_kick.stopping, &mut inbound.split().1).await?;
+            warn!(target: "lazymc", "Server stopping for held client");
+            return Ok(false);
         }
 
         // Timeout reached, kick with starting message
         Err(_) => {
-            warn!(target: "lazymc", "Held client reached timeout of {}s, disconnecting", config.join_hold.timeout);
-            kick(&config.join_kick.starting, &mut inbound.split().1).await?;
+            warn!(target: "lazymc", "Held client reached timeout of {}s", config.join.hold.timeout);
+            return Ok(false);
         }
     }
-
-    // Gracefully close connection
-    match inbound.shutdown().await {
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-        Err(_) => return Err(()),
-    }
-
-    Ok(())
 }
 
 /// Kick client with a message.
