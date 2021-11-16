@@ -1,6 +1,4 @@
-use std::ops::Deref;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bytes::BytesMut;
 use minecraft_protocol::data::chat::{Message, Payload};
@@ -8,19 +6,18 @@ use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
-use minecraft_protocol::version::v1_14_4::login::{LoginDisconnect, LoginStart};
+use minecraft_protocol::version::v1_14_4::login::LoginStart;
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
-use tokio::io::{self, AsyncWriteExt};
-use tokio::net::tcp::WriteHalf;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::time;
 
 use crate::config::*;
-#[cfg(feature = "lobby")]
-use crate::lobby;
-use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
-use crate::server::{self, Server, State};
-use crate::service;
+use crate::join;
+use crate::proto::action;
+use crate::proto::client::{Client, ClientInfo, ClientState};
+use crate::proto::packet::{self, RawPacket};
+use crate::proto::packets;
+use crate::server::{self, Server};
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
@@ -35,16 +32,13 @@ pub async fn serve(
     // Incoming buffer and packet holding queue
     let mut buf = BytesMut::new();
 
-    // Remember inbound packets, used for client holding and forwarding
-    let remember_inbound = config.join.methods.contains(&Method::Hold)
-        || config.join.methods.contains(&Method::Forward);
+    // Remember inbound packets, track client info
     let mut inbound_history = BytesMut::new();
-
     let mut client_info = ClientInfo::empty();
 
     loop {
         // Read packet from stream
-        let (packet, raw) = match proto::read_packet(&client, &mut buf, &mut reader).await {
+        let (packet, raw) = match packet::read_packet(&client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -58,7 +52,7 @@ pub async fn serve(
 
         // Hijack handshake
         if client_state == ClientState::Handshake
-            && packet.id == proto::packets::handshake::SERVER_HANDSHAKE
+            && packet.id == packets::handshake::SERVER_HANDSHAKE
         {
             // Parse handshake
             let handshake = match Handshake::decode(&mut packet.data.as_slice()) {
@@ -84,8 +78,8 @@ pub async fn serve(
                 .replace(handshake.protocol_version);
             client.set_state(new_state);
 
-            // If login handshake and holding is enabled, hold packets
-            if new_state == ClientState::Login && remember_inbound {
+            // If loggin in with handshake, remember inbound
+            if new_state == ClientState::Login {
                 inbound_history.extend(raw);
             }
 
@@ -93,8 +87,7 @@ pub async fn serve(
         }
 
         // Hijack server status packet
-        if client_state == ClientState::Status && packet.id == proto::packets::status::SERVER_STATUS
-        {
+        if client_state == ClientState::Status && packet.id == packets::status::SERVER_STATUS {
             let server_status = server_status(&config, &server).await;
             let packet = StatusResponse { server_status };
 
@@ -108,15 +101,13 @@ pub async fn serve(
         }
 
         // Hijack ping packet
-        if client_state == ClientState::Status && packet.id == proto::packets::status::SERVER_PING {
+        if client_state == ClientState::Status && packet.id == packets::status::SERVER_PING {
             writer.write_all(&raw).await.map_err(|_| ())?;
             continue;
         }
 
         // Hijack login start
-        if client_state == ClientState::Login
-            && packet.id == proto::packets::login::SERVER_LOGIN_START
-        {
+        if client_state == ClientState::Login && packet.id == packets::login::SERVER_LOGIN_START {
             // Try to get login username, update client info
             // TODO: we should always parse this packet successfully
             let username = LoginStart::decode(&mut packet.data.as_slice())
@@ -132,100 +123,37 @@ pub async fn serve(
                     }
                     None => info!(target: "lazymc", "Kicked player because lockout is enabled"),
                 }
-                kick(&client, &config.lockout.message, &mut writer).await?;
+                action::kick(&client, &config.lockout.message, &mut writer).await?;
                 break;
             }
 
             // Start server if not starting yet
             Server::start(config.clone(), server.clone(), username).await;
 
-            // Use join occupy methods
-            for method in &config.join.methods {
-                match method {
-                    // Kick method, immediately kick client
-                    Method::Kick => {
-                        trace!(target: "lazymc", "Using kick method to occupy joining client");
+            // Remember inbound packets
+            inbound_history.extend(&raw);
+            inbound_history.extend(&buf);
 
-                        // Select message and kick
-                        let msg = match server.state() {
-                            server::State::Starting
-                            | server::State::Stopped
-                            | server::State::Started => &config.join.kick.starting,
-                            server::State::Stopping => &config.join.kick.stopping,
-                        };
-                        kick(&client, msg, &mut writer).await?;
-                        break;
-                    }
+            // Build inbound packet queue with everything from login start (including this)
+            let mut login_queue = BytesMut::with_capacity(raw.len() + buf.len());
+            login_queue.extend(&raw);
+            login_queue.extend(&buf);
 
-                    // Hold method, hold client connection while server starts
-                    Method::Hold => {
-                        trace!(target: "lazymc", "Using hold method to occupy joining client");
+            // Buf is fully consumed here
+            buf.clear();
 
-                        // Server must be starting
-                        if server.state() != State::Starting {
-                            continue;
-                        }
-
-                        // Hold login packet and remaining read bytes
-                        inbound_history.extend(&raw);
-                        inbound_history.extend(buf.split_off(0));
-
-                        // Start holding
-                        if hold(&config, &server).await? {
-                            service::server::route_proxy_queue(inbound, config, inbound_history);
-                            return Ok(());
-                        }
-                    }
-
-                    // Forward method, forward client connection while server starts
-                    Method::Forward => {
-                        trace!(target: "lazymc", "Using forward method to occupy joining client");
-
-                        // Hold login packet and remaining read bytes
-                        inbound_history.extend(&raw);
-                        inbound_history.extend(buf.split_off(0));
-
-                        // Forward client
-                        debug!(target: "lazymc", "Forwarding client to {:?}!", config.join.forward.address);
-
-                        service::server::route_proxy_address_queue(
-                            inbound,
-                            config.join.forward.address,
-                            inbound_history,
-                        );
-                        return Ok(());
-
-                        // TODO: do not consume client here, allow other join method on fail
-                    }
-
-                    // Lobby method, keep client in lobby while server starts
-                    #[cfg(feature = "lobby")]
-                    Method::Lobby => {
-                        trace!(target: "lazymc", "Using lobby method to occupy joining client");
-
-                        // Build queue with login packet and any additionally received
-                        let mut queue = BytesMut::with_capacity(raw.len() + buf.len());
-                        queue.extend(raw);
-                        queue.extend(buf.split_off(0));
-
-                        // Start lobby
-                        lobby::serve(client, client_info, inbound, config, server, queue).await?;
-                        return Ok(());
-                        // TODO: do not consume client here, allow other join method on fail
-                    }
-
-                    // Lobby method, keep client in lobby while server starts
-                    #[cfg(not(feature = "lobby"))]
-                    Method::Lobby => {
-                        error!(target: "lazymc", "Lobby join method not supported in this lazymc build");
-                    }
-                }
-            }
-
-            debug!(target: "lazymc", "No method left to occupy joining client, disconnecting");
-
-            // Done occupying client, just disconnect
-            break;
+            // Start occupying client
+            join::occupy(
+                client,
+                client_info,
+                config,
+                server,
+                inbound,
+                inbound_history,
+                login_queue,
+            )
+            .await?;
+            return Ok(());
         }
 
         // Show unhandled packet warning
@@ -234,94 +162,7 @@ pub async fn serve(
         debug!(target: "lazymc", "- Packet ID: {}", packet.id);
     }
 
-    // Gracefully close connection
-    match writer.shutdown().await {
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-        Err(_) => return Err(()),
-    }
-
     Ok(())
-}
-
-/// Hold a client while server starts.
-///
-/// Returns holding status. `true` if client is held and it should be proxied, `false` it was held
-/// but it timed out.
-pub async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
-    trace!(target: "lazymc", "Started holding client");
-
-    // A task to wait for suitable server state
-    // Waits for started state, errors if stopping/stopped state is reached
-    let task_wait = async {
-        let mut state = server.state_receiver();
-        loop {
-            // Wait for state change
-            state.changed().await.unwrap();
-
-            match state.borrow().deref() {
-                // Still waiting on server start
-                State::Starting => {
-                    trace!(target: "lazymc", "Server not ready, holding client for longer");
-                    continue;
-                }
-
-                // Server started, start relaying and proxy
-                State::Started => {
-                    break true;
-                }
-
-                // Server stopping, this shouldn't happen, kick
-                State::Stopping => {
-                    warn!(target: "lazymc", "Server stopping for held client, disconnecting");
-                    break false;
-                }
-
-                // Server stopped, this shouldn't happen, disconnect
-                State::Stopped => {
-                    error!(target: "lazymc", "Server stopped for held client, disconnecting");
-                    break false;
-                }
-            }
-        }
-    };
-
-    // Wait for server state with timeout
-    let timeout = Duration::from_secs(config.join.hold.timeout as u64);
-    match time::timeout(timeout, task_wait).await {
-        // Relay client to proxy
-        Ok(true) => {
-            info!(target: "lazymc", "Server ready for held client, relaying to server");
-            Ok(true)
-        }
-
-        // Server stopping/stopped, this shouldn't happen, kick
-        Ok(false) => {
-            warn!(target: "lazymc", "Server stopping for held client");
-            Ok(false)
-        }
-
-        // Timeout reached, kick with starting message
-        Err(_) => {
-            warn!(target: "lazymc", "Held client reached timeout of {}s", config.join.hold.timeout);
-            Ok(false)
-        }
-    }
-}
-
-/// Kick client with a message.
-///
-/// Should close connection afterwards.
-async fn kick(client: &Client, msg: &str, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let packet = LoginDisconnect {
-        reason: Message::new(Payload::text(msg)),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(proto::packets::login::CLIENT_DISCONNECT, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())
 }
 
 /// Build server status object to respond to client with.

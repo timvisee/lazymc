@@ -16,7 +16,7 @@ use minecraft_protocol::version::v1_17_1::game::{
     Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
 use nbt::CompoundTag;
-use tokio::io::{self, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
@@ -25,7 +25,11 @@ use uuid::Uuid;
 
 use crate::config::*;
 use crate::mc;
-use crate::proto::{self, Client, ClientInfo, ClientState, RawPacket};
+use crate::net;
+use crate::proto;
+use crate::proto::client::{Client, ClientInfo, ClientState};
+use crate::proto::packet::{self, RawPacket};
+use crate::proto::packets;
 use crate::proxy;
 use crate::server::{Server, State};
 
@@ -62,7 +66,7 @@ const SERVER_BRAND: &[u8] = b"lazymc";
 // TODO: do not drop error here, return Box<dyn Error>
 // TODO: on error, nicely kick client with message
 pub async fn serve(
-    client: Client,
+    client: &Client,
     client_info: ClientInfo,
     mut inbound: TcpStream,
     config: Arc<Config>,
@@ -88,7 +92,7 @@ pub async fn serve(
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(&client, &mut inbound_buf, &mut reader).await
+        let (packet, _raw) = match packet::read_packet(client, &mut inbound_buf, &mut reader).await
         {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
@@ -102,9 +106,7 @@ pub async fn serve(
         let client_state = client.state();
 
         // Hijack login start
-        if client_state == ClientState::Login
-            && packet.id == proto::packets::login::SERVER_LOGIN_START
-        {
+        if client_state == ClientState::Login && packet.id == packets::login::SERVER_LOGIN_START {
             // Parse login start packet
             let login_start = LoginStart::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
@@ -113,21 +115,21 @@ pub async fn serve(
             // Respond with set compression if compression is enabled based on threshold
             if proto::COMPRESSION_THRESHOLD >= 0 {
                 trace!(target: "lazymc::lobby", "Enabling compression for lobby client because server has it enabled (threshold: {})", proto::COMPRESSION_THRESHOLD);
-                respond_set_compression(&client, &mut writer, proto::COMPRESSION_THRESHOLD).await?;
+                respond_set_compression(client, &mut writer, proto::COMPRESSION_THRESHOLD).await?;
                 client.set_compression(proto::COMPRESSION_THRESHOLD);
             }
 
             // Respond with login success, switch to play state
-            respond_login_success(&client, &mut writer, &login_start).await?;
+            respond_login_success(client, &mut writer, &login_start).await?;
             client.set_state(ClientState::Play);
 
             trace!(target: "lazymc::lobby", "Client login success, sending required play packets for lobby world");
 
             // Send packets to client required to get into workable play state for lobby world
-            send_lobby_play_packets(&client, &mut writer, &server).await?;
+            send_lobby_play_packets(client, &mut writer, &server).await?;
 
             // Wait for server to come online, then set up new connection to it
-            stage_wait(&client, &server, &config, &mut writer).await?;
+            stage_wait(client, &server, &config, &mut writer).await?;
             let (server_client, mut outbound, mut server_buf) =
                 connect_to_server(client_info, &config).await?;
 
@@ -136,10 +138,10 @@ pub async fn serve(
                 wait_for_server_join_game(&server_client, &mut outbound, &mut server_buf).await?;
 
             // Reset lobby title
-            send_lobby_title(&client, &mut writer, "").await?;
+            send_lobby_title(client, &mut writer, "").await?;
 
             // Play ready sound if configured
-            play_lobby_ready_sound(&client, &mut writer, &config).await?;
+            play_lobby_ready_sound(client, &mut writer, &config).await?;
 
             // Wait a second because Notchian servers are slow
             // See: https://wiki.vg/Protocol#Login_Success
@@ -147,7 +149,7 @@ pub async fn serve(
             time::sleep(SERVER_WARMUP).await;
 
             // Send respawn packet, initiates teleport to real server world
-            send_respawn_from_join(&client, &mut writer, join_game).await?;
+            send_respawn_from_join(client, &mut writer, join_game).await?;
 
             // Drain inbound connection so we don't confuse the server
             // TODO: can we void everything? we might need to forward everything to server except
@@ -172,11 +174,7 @@ pub async fn serve(
     }
 
     // Gracefully close connection
-    match writer.shutdown().await {
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-        Err(_) => return Err(()),
-    }
+    net::close_tcp_stream(inbound).await.map_err(|_| ())?;
 
     Ok(())
 }
@@ -192,8 +190,7 @@ async fn respond_set_compression(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::login::CLIENT_SET_COMPRESSION, data).encode(client)?;
+    let response = RawPacket::new(packets::login::CLIENT_SET_COMPRESSION, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -217,8 +214,7 @@ async fn respond_login_success(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::login::CLIENT_LOGIN_SUCCESS, data).encode(client)?;
+    let response = RawPacket::new(packets::login::CLIENT_LOGIN_SUCCESS, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -310,7 +306,7 @@ async fn send_lobby_join_game(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::packets::play::CLIENT_JOIN_GAME, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_JOIN_GAME, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -326,8 +322,7 @@ async fn send_lobby_brand(client: &Client, writer: &mut WriteHalf<'_>) -> Result
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_PLUGIN_MESSAGE, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_PLUGIN_MESSAGE, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -350,8 +345,7 @@ async fn send_lobby_player_pos(client: &Client, writer: &mut WriteHalf<'_>) -> R
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_PLAYER_POS_LOOK, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_PLAYER_POS_LOOK, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -370,7 +364,7 @@ async fn send_lobby_time_update(client: &Client, writer: &mut WriteHalf<'_>) -> 
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::packets::play::CLIENT_TIME_UPDATE, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_TIME_UPDATE, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -388,7 +382,7 @@ async fn send_keep_alive(client: &Client, writer: &mut WriteHalf<'_>) -> Result<
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::packets::play::CLIENT_KEEP_ALIVE, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_KEEP_ALIVE, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     // TODO: verify we receive keep alive response with same ID from client
@@ -418,8 +412,7 @@ async fn send_lobby_title(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_SET_TITLE_TEXT, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_TEXT, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     // Set subtitle
@@ -430,8 +423,7 @@ async fn send_lobby_title(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_SET_TITLE_SUBTITLE, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_SUBTITLE, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     // Set title times
@@ -453,8 +445,7 @@ async fn send_lobby_title(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_SET_TITLE_TIMES, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_TIMES, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -479,8 +470,7 @@ async fn send_lobby_sound_effect(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response =
-        RawPacket::new(proto::packets::play::CLIENT_NAMED_SOUND_EFFECT, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_NAMED_SOUND_EFFECT, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -508,7 +498,7 @@ async fn send_respawn_from_join(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(proto::packets::play::CLIENT_RESPAWN, data).encode(client)?;
+    let response = RawPacket::new(packets::play::CLIENT_RESPAWN, data).encode(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
@@ -654,8 +644,7 @@ async fn connect_to_server_no_timeout(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let request =
-        RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, data).encode(&tmp_client)?;
+    let request = RawPacket::new(packets::handshake::SERVER_HANDSHAKE, data).encode(&tmp_client)?;
     writer.write_all(&request).await.map_err(|_| ())?;
 
     // Request login start
@@ -666,8 +655,7 @@ async fn connect_to_server_no_timeout(
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let request =
-        RawPacket::new(proto::packets::login::SERVER_LOGIN_START, data).encode(&tmp_client)?;
+    let request = RawPacket::new(packets::login::SERVER_LOGIN_START, data).encode(&tmp_client)?;
     writer.write_all(&request).await.map_err(|_| ())?;
 
     // Incoming buffer
@@ -675,7 +663,7 @@ async fn connect_to_server_no_timeout(
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(&tmp_client, &mut buf, &mut reader).await {
+        let (packet, _raw) = match packet::read_packet(&tmp_client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -688,8 +676,7 @@ async fn connect_to_server_no_timeout(
         let client_state = tmp_client.state();
 
         // Catch set compression
-        if client_state == ClientState::Login
-            && packet.id == proto::packets::login::CLIENT_SET_COMPRESSION
+        if client_state == ClientState::Login && packet.id == packets::login::CLIENT_SET_COMPRESSION
         {
             // Decode compression packet
             let set_compression =
@@ -713,9 +700,7 @@ async fn connect_to_server_no_timeout(
         }
 
         // Hijack login success
-        if client_state == ClientState::Login
-            && packet.id == proto::packets::login::CLIENT_LOGIN_SUCCESS
-        {
+        if client_state == ClientState::Login && packet.id == packets::login::CLIENT_LOGIN_SUCCESS {
             trace!(target: "lazymc::lobby", "Received login success from server connection, change to play mode");
 
             // TODO: parse this packet to ensure it's fine
@@ -743,11 +728,7 @@ async fn connect_to_server_no_timeout(
     }
 
     // Gracefully close connection
-    match writer.shutdown().await {
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-        Err(_) => return Err(()),
-    }
+    net::close_tcp_stream(outbound).await.map_err(|_| ())?;
 
     Err(())
 }
@@ -780,11 +761,11 @@ async fn wait_for_server_join_game_no_timeout(
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
 ) -> Result<JoinGame, ()> {
-    let (mut reader, mut writer) = outbound.split();
+    let (mut reader, mut _writer) = outbound.split();
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(client, buf, &mut reader).await {
+        let (packet, _raw) = match packet::read_packet(client, buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
@@ -794,7 +775,7 @@ async fn wait_for_server_join_game_no_timeout(
         };
 
         // Catch join game
-        if packet.id == proto::packets::play::CLIENT_JOIN_GAME {
+        if packet.id == packets::play::CLIENT_JOIN_GAME {
             let join_game = JoinGame::decode(&mut packet.data.as_slice()).map_err(|err| {
                 dbg!(err);
             })?;
@@ -808,11 +789,7 @@ async fn wait_for_server_join_game_no_timeout(
     }
 
     // Gracefully close connection
-    match writer.shutdown().await {
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotConnected => {}
-        Err(_) => return Err(()),
-    }
+    net::close_tcp_stream_ref(outbound).await.map_err(|_| ())?;
 
     Err(())
 }

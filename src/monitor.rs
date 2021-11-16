@@ -16,7 +16,9 @@ use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
-use crate::proto::{self, Client, ClientState, RawPacket};
+use crate::proto::client::{Client, ClientState};
+use crate::proto::packet::{self, RawPacket};
+use crate::proto::packets;
 use crate::server::{Server, State};
 
 /// Monitor ping inverval in seconds.
@@ -133,7 +135,7 @@ async fn send_handshake(
     let mut packet = Vec::new();
     handshake.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(proto::packets::handshake::SERVER_HANDSHAKE, packet)
+    let raw = RawPacket::new(packets::handshake::SERVER_HANDSHAKE, packet)
         .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -143,7 +145,7 @@ async fn send_handshake(
 
 /// Send status request.
 async fn request_status(client: &Client, stream: &mut TcpStream) -> Result<(), ()> {
-    let raw = RawPacket::new(proto::packets::status::SERVER_STATUS, vec![])
+    let raw = RawPacket::new(packets::status::SERVER_STATUS, vec![])
         .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -158,7 +160,7 @@ async fn send_ping(client: &Client, stream: &mut TcpStream) -> Result<u64, ()> {
     let mut packet = Vec::new();
     ping.encode(&mut packet).map_err(|_| ())?;
 
-    let raw = RawPacket::new(proto::packets::status::SERVER_PING, packet)
+    let raw = RawPacket::new(packets::status::SERVER_PING, packet)
         .encode(client)
         .map_err(|_| ())?;
     stream.write_all(&raw).await.map_err(|_| ())?;
@@ -173,14 +175,14 @@ async fn wait_for_status(client: &Client, stream: &mut TcpStream) -> Result<Serv
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(client, &mut buf, &mut reader).await {
+        let (packet, _raw) = match packet::read_packet(client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => continue,
         };
 
         // Catch status response
-        if packet.id == proto::packets::status::CLIENT_STATUS {
+        if packet.id == packets::status::CLIENT_STATUS {
             let status = StatusResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
             return Ok(status.server_status);
         }
@@ -209,14 +211,14 @@ async fn wait_for_ping(client: &Client, stream: &mut TcpStream, token: u64) -> R
 
     loop {
         // Read packet from stream
-        let (packet, _raw) = match proto::read_packet(client, &mut buf, &mut reader).await {
+        let (packet, _raw) = match packet::read_packet(client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => continue,
         };
 
         // Catch ping response
-        if packet.id == proto::packets::status::CLIENT_PING {
+        if packet.id == packets::status::CLIENT_PING {
             let ping = PingResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
             // Ping token must match

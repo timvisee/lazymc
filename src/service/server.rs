@@ -6,7 +6,7 @@ use futures::FutureExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
-use crate::proto::Client;
+use crate::proto::client::Client;
 use crate::proxy;
 use crate::server::{self, Server};
 use crate::service;

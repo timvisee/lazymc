@@ -5,6 +5,8 @@ use tokio::io;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
+use crate::net;
+
 /// Proxy the inbound stream to a target address.
 pub async fn proxy(inbound: TcpStream, addr_target: SocketAddr) -> Result<(), Box<dyn Error>> {
     proxy_with_queue(inbound, addr_target, &[]).await
@@ -63,6 +65,9 @@ pub async fn proxy_inbound_outbound_with_queue(
     };
 
     tokio::try_join!(client_to_server, server_to_client)?;
+
+    // Gracefully close connection if not done already
+    net::close_tcp_stream(inbound).await?;
 
     Ok(())
 }
