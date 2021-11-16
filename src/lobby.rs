@@ -8,15 +8,13 @@ use bytes::BytesMut;
 use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::decoder::Decoder;
-use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess, SetCompression};
 use minecraft_protocol::version::v1_17_1::game::{
-    ClientBoundKeepAlive, JoinGame, NamedSoundEffect, PlayerPositionAndLook, PluginMessage,
-    Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
+    ClientBoundKeepAlive, ClientBoundPluginMessage, JoinGame, NamedSoundEffect,
+    PlayerPositionAndLook, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
 use nbt::CompoundTag;
-use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
@@ -28,8 +26,7 @@ use crate::mc;
 use crate::net;
 use crate::proto;
 use crate::proto::client::{Client, ClientInfo, ClientState};
-use crate::proto::packet::{self, RawPacket};
-use crate::proto::packets;
+use crate::proto::{packet, packets};
 use crate::proxy;
 use crate::server::{Server, State};
 
@@ -185,15 +182,7 @@ async fn respond_set_compression(
     writer: &mut WriteHalf<'_>,
     threshold: i32,
 ) -> Result<(), ()> {
-    let packet = SetCompression { threshold };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::login::CLIENT_SET_COMPRESSION, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(SetCompression { threshold }, client, writer).await
 }
 
 /// Respond to client with login success packet
@@ -203,21 +192,18 @@ async fn respond_login_success(
     writer: &mut WriteHalf<'_>,
     login_start: &LoginStart,
 ) -> Result<(), ()> {
-    let packet = LoginSuccess {
-        uuid: Uuid::new_v3(
-            &Uuid::new_v3(&Uuid::nil(), b"OfflinePlayer"),
-            login_start.name.as_bytes(),
-        ),
-        username: login_start.name.clone(),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::login::CLIENT_LOGIN_SUCCESS, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        LoginSuccess {
+            uuid: Uuid::new_v3(
+                &Uuid::new_v3(&Uuid::nil(), b"OfflinePlayer"),
+                login_start.name.as_bytes(),
+            ),
+            username: login_start.name.clone(),
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Play lobby ready sound effect if configured.
@@ -271,84 +257,75 @@ async fn send_lobby_join_game(
     server: &Server,
 ) -> Result<(), ()> {
     // Send Minecrafts default states, slightly customised for lobby world
-    let packet = {
-        let status = server.status().await;
+    packet::write_packet(
+        {
+            let status = server.status().await;
 
-        JoinGame {
-            // Player ID must be unique, if it collides with another server entity ID the player gets
-            // in a weird state and cannot move
-            entity_id: 0,
-            // TODO: use real server value
-            hardcore: false,
-            game_mode: 3,
-            previous_game_mode: -1i8 as u8,
-            world_names: vec![
-                "minecraft:overworld".into(),
-                "minecraft:the_nether".into(),
-                "minecraft:the_end".into(),
-            ],
-            dimension_codec: snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt")),
-            dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
-            world_name: "lazymc:lobby".into(),
-            hashed_seed: 0,
-            max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
-            // TODO: use real server value
-            view_distance: 10,
-            // TODO: use real server value
-            reduced_debug_info: false,
-            // TODO: use real server value
-            enable_respawn_screen: true,
-            is_debug: true,
-            is_flat: false,
-        }
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_JOIN_GAME, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+            JoinGame {
+                // Player ID must be unique, if it collides with another server entity ID the player gets
+                // in a weird state and cannot move
+                entity_id: 0,
+                // TODO: use real server value
+                hardcore: false,
+                game_mode: 3,
+                previous_game_mode: -1i8 as u8,
+                world_names: vec![
+                    "minecraft:overworld".into(),
+                    "minecraft:the_nether".into(),
+                    "minecraft:the_end".into(),
+                ],
+                dimension_codec: snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt")),
+                dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
+                world_name: "lazymc:lobby".into(),
+                hashed_seed: 0,
+                max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
+                // TODO: use real server value
+                view_distance: 10,
+                // TODO: use real server value
+                reduced_debug_info: false,
+                // TODO: use real server value
+                enable_respawn_screen: true,
+                is_debug: true,
+                is_flat: false,
+            }
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send lobby brand to client.
 async fn send_lobby_brand(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let packet = PluginMessage {
-        channel: "minecraft:brand".into(),
-        data: SERVER_BRAND.into(),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_PLUGIN_MESSAGE, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        ClientBoundPluginMessage {
+            channel: "minecraft:brand".into(),
+            data: SERVER_BRAND.into(),
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send lobby player position to client.
 async fn send_lobby_player_pos(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
     // Send player location, disables download terrain screen
-    let packet = PlayerPositionAndLook {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-        yaw: 0.0,
-        pitch: 90.0,
-        flags: 0b00000000,
-        teleport_id: 0,
-        dismount_vehicle: true,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_PLAYER_POS_LOOK, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        PlayerPositionAndLook {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            yaw: 0.0,
+            pitch: 90.0,
+            flags: 0b00000000,
+            teleport_id: 0,
+            dismount_vehicle: true,
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send lobby time update to client.
@@ -356,38 +333,32 @@ async fn send_lobby_time_update(client: &Client, writer: &mut WriteHalf<'_>) -> 
     const MC_TIME_NOON: i64 = 6000;
 
     // Send time update, required once for keep-alive packets
-    let packet = TimeUpdate {
-        world_age: MC_TIME_NOON,
-        time_of_day: MC_TIME_NOON,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_TIME_UPDATE, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        TimeUpdate {
+            world_age: MC_TIME_NOON,
+            time_of_day: MC_TIME_NOON,
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send keep alive packet to client.
 ///
 /// Required periodically in play mode to prevent client timeout.
 async fn send_keep_alive(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    let packet = ClientBoundKeepAlive {
-        // Keep sending new IDs
-        id: KEEP_ALIVE_ID.fetch_add(1, Ordering::Relaxed),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_KEEP_ALIVE, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
+    packet::write_packet(
+        ClientBoundKeepAlive {
+            // Keep sending new IDs
+            id: KEEP_ALIVE_ID.fetch_add(1, Ordering::Relaxed),
+        },
+        client,
+        writer,
+    )
+    .await
 
     // TODO: verify we receive keep alive response with same ID from client
-
-    Ok(())
 }
 
 /// Send lobby title packets to client.
@@ -405,50 +376,45 @@ async fn send_lobby_title(
     let subtitle = text.lines().skip(1).collect::<Vec<_>>().join("\n");
 
     // Set title
-    let packet = SetTitleText {
-        text: Message::new(Payload::text(title)),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_TEXT, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
+    packet::write_packet(
+        SetTitleText {
+            text: Message::new(Payload::text(title)),
+        },
+        client,
+        writer,
+    )
+    .await?;
 
     // Set subtitle
-    let packet = SetTitleSubtitle {
-        text: Message::new(Payload::text(&subtitle)),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_SUBTITLE, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
+    packet::write_packet(
+        SetTitleSubtitle {
+            text: Message::new(Payload::text(&subtitle)),
+        },
+        client,
+        writer,
+    )
+    .await?;
 
     // Set title times
-    let packet = if title.is_empty() && subtitle.is_empty() {
-        // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
-        SetTitleTimes {
-            fade_in: 10,
-            stay: 70,
-            fade_out: 20,
-        }
-    } else {
-        SetTitleTimes {
-            fade_in: 0,
-            stay: KEEP_ALIVE_INTERVAL.as_secs() as i32 * mc::TICKS_PER_SECOND as i32 * 2,
-            fade_out: 0,
-        }
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_SET_TITLE_TIMES, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        if title.is_empty() && subtitle.is_empty() {
+            // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
+            SetTitleTimes {
+                fade_in: 10,
+                stay: 70,
+                fade_out: 20,
+            }
+        } else {
+            SetTitleTimes {
+                fade_in: 0,
+                stay: KEEP_ALIVE_INTERVAL.as_secs() as i32 * mc::TICKS_PER_SECOND as i32 * 2,
+                fade_out: 0,
+            }
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send lobby ready sound effect to client.
@@ -457,23 +423,20 @@ async fn send_lobby_sound_effect(
     writer: &mut WriteHalf<'_>,
     sound_name: &str,
 ) -> Result<(), ()> {
-    let packet = NamedSoundEffect {
-        sound_name: sound_name.into(),
-        sound_category: 0,
-        effect_pos_x: 0,
-        effect_pos_y: 0,
-        effect_pos_z: 0,
-        volume: 1.0,
-        pitch: 1.0,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_NAMED_SOUND_EFFECT, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        NamedSoundEffect {
+            sound_name: sound_name.into(),
+            sound_category: 0,
+            effect_pos_x: 0,
+            effect_pos_y: 0,
+            effect_pos_z: 0,
+            volume: 1.0,
+            pitch: 1.0,
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// Send respawn packet to client to jump from lobby into now loaded server.
@@ -484,24 +447,21 @@ async fn send_respawn_from_join(
     writer: &mut WriteHalf<'_>,
     join_game: JoinGame,
 ) -> Result<(), ()> {
-    let packet = Respawn {
-        dimension: join_game.dimension,
-        world_name: join_game.world_name,
-        hashed_seed: join_game.hashed_seed,
-        game_mode: join_game.game_mode,
-        previous_game_mode: join_game.previous_game_mode,
-        is_debug: join_game.is_debug,
-        is_flat: join_game.is_flat,
-        copy_metadata: false,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let response = RawPacket::new(packets::play::CLIENT_RESPAWN, data).encode(client)?;
-    writer.write_all(&response).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        Respawn {
+            dimension: join_game.dimension,
+            world_name: join_game.world_name,
+            hashed_seed: join_game.hashed_seed,
+            game_mode: join_game.game_mode,
+            previous_game_mode: join_game.previous_game_mode,
+            is_debug: join_game.is_debug,
+            is_flat: join_game.is_flat,
+            copy_metadata: false,
+        },
+        client,
+        writer,
+    )
+    .await
 }
 
 /// An infinite keep-alive loop.
@@ -634,29 +594,27 @@ async fn connect_to_server_no_timeout(
     tmp_client.set_state(ClientState::Login);
 
     // Handshake packet
-    let packet = Handshake {
-        protocol_version: client_info.protocol_version.unwrap(),
-        server_addr: config.server.address.ip().to_string(),
-        server_port: config.server.address.port(),
-        next_state: ClientState::Login.to_id(),
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let request = RawPacket::new(packets::handshake::SERVER_HANDSHAKE, data).encode(&tmp_client)?;
-    writer.write_all(&request).await.map_err(|_| ())?;
+    packet::write_packet(
+        Handshake {
+            protocol_version: client_info.protocol_version.unwrap(),
+            server_addr: config.server.address.ip().to_string(),
+            server_port: config.server.address.port(),
+            next_state: ClientState::Login.to_id(),
+        },
+        &tmp_client,
+        &mut writer,
+    )
+    .await?;
 
     // Request login start
-    let packet = LoginStart {
-        name: client_info.username.ok_or(())?,
-    };
-
-    let mut data = Vec::new();
-    packet.encode(&mut data).map_err(|_| ())?;
-
-    let request = RawPacket::new(packets::login::SERVER_LOGIN_START, data).encode(&tmp_client)?;
-    writer.write_all(&request).await.map_err(|_| ())?;
+    packet::write_packet(
+        LoginStart {
+            name: client_info.username.ok_or(())?,
+        },
+        &tmp_client,
+        &mut writer,
+    )
+    .await?;
 
     // Incoming buffer
     let mut buf = BytesMut::new();

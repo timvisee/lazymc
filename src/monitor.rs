@@ -7,18 +7,17 @@ use std::time::Duration;
 use bytes::BytesMut;
 use minecraft_protocol::data::server_status::ServerStatus;
 use minecraft_protocol::decoder::Decoder;
-use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
-use minecraft_protocol::version::v1_14_4::status::{PingRequest, PingResponse, StatusResponse};
+use minecraft_protocol::version::v1_14_4::status::{
+    PingRequest, PingResponse, StatusRequest, StatusResponse,
+};
 use rand::Rng;
-use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
 use crate::proto::client::{Client, ClientState};
-use crate::proto::packet::{self, RawPacket};
-use crate::proto::packets;
+use crate::proto::{packet, packets};
 use crate::server::{Server, State};
 
 /// Monitor ping inverval in seconds.
@@ -125,45 +124,28 @@ async fn send_handshake(
     config: &Config,
     addr: SocketAddr,
 ) -> Result<(), ()> {
-    let handshake = Handshake {
-        protocol_version: config.public.protocol as i32,
-        server_addr: addr.ip().to_string(),
-        server_port: addr.port(),
-        next_state: ClientState::Status.to_id(),
-    };
-
-    let mut packet = Vec::new();
-    handshake.encode(&mut packet).map_err(|_| ())?;
-
-    let raw = RawPacket::new(packets::handshake::SERVER_HANDSHAKE, packet)
-        .encode(client)
-        .map_err(|_| ())?;
-    stream.write_all(&raw).await.map_err(|_| ())?;
-
-    Ok(())
+    packet::write_packet(
+        Handshake {
+            protocol_version: config.public.protocol as i32,
+            server_addr: addr.ip().to_string(),
+            server_port: addr.port(),
+            next_state: ClientState::Status.to_id(),
+        },
+        client,
+        &mut stream.split().1,
+    )
+    .await
 }
 
 /// Send status request.
 async fn request_status(client: &Client, stream: &mut TcpStream) -> Result<(), ()> {
-    let raw = RawPacket::new(packets::status::SERVER_STATUS, vec![])
-        .encode(client)
-        .map_err(|_| ())?;
-    stream.write_all(&raw).await.map_err(|_| ())?;
-    Ok(())
+    packet::write_packet(StatusRequest {}, client, &mut stream.split().1).await
 }
 
 /// Send status request.
 async fn send_ping(client: &Client, stream: &mut TcpStream) -> Result<u64, ()> {
     let token = rand::thread_rng().gen();
-    let ping = PingRequest { time: token };
-
-    let mut packet = Vec::new();
-    ping.encode(&mut packet).map_err(|_| ())?;
-
-    let raw = RawPacket::new(packets::status::SERVER_PING, packet)
-        .encode(client)
-        .map_err(|_| ())?;
-    stream.write_all(&raw).await.map_err(|_| ())?;
+    packet::write_packet(PingRequest { time: token }, client, &mut stream.split().1).await?;
     Ok(token)
 }
 

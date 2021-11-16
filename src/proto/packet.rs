@@ -4,9 +4,11 @@ use bytes::BytesMut;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use minecraft_protocol::encoder::Encoder;
+use minecraft_protocol::version::PacketId;
 use tokio::io;
-use tokio::io::AsyncReadExt;
-use tokio::net::tcp::ReadHalf;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 use crate::proto::client::Client;
 use crate::proto::BUF_SIZE;
@@ -196,4 +198,19 @@ pub async fn read_packet(
     let packet = RawPacket::decode(client, &raw)?;
 
     Ok(Some((packet, raw.to_vec())))
+}
+
+/// Write packet to stream writer.
+pub async fn write_packet(
+    packet: impl PacketId + Encoder,
+    client: &Client,
+    writer: &mut WriteHalf<'_>,
+) -> Result<(), ()> {
+    let mut data = Vec::new();
+    packet.encode(&mut data).map_err(|_| ())?;
+
+    let response = RawPacket::new(packet.packet_id(), data).encode(client)?;
+    writer.write_all(&response).await.map_err(|_| ())?;
+
+    Ok(())
 }
