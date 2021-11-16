@@ -685,7 +685,7 @@ checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 [[package]]
 name = "minecraft-protocol"
 version = "0.1.0"
-source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=4e6a1f9#4e6a1f93807f35671943630c9bdc0d0c5da67eb8"
+source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=a14b40e#a14b40ea9d9a9ed54a6f6546b6d19bc0db1b6c8c"
 dependencies = [
  "byteorder",
  "minecraft-protocol-derive",
@@ -698,7 +698,7 @@ dependencies = [
 [[package]]
 name = "minecraft-protocol-derive"
 version = "0.0.0"
-source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=4e6a1f9#4e6a1f93807f35671943630c9bdc0d0c5da67eb8"
+source = "git+https://github.com/timvisee/rust-minecraft-protocol?rev=a14b40e#a14b40ea9d9a9ed54a6f6546b6d19bc0db1b6c8c"
 dependencies = [
  "proc-macro2",
  "quote",

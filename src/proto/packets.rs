@@ -3,14 +3,14 @@
 #![allow(unused)]
 
 pub mod handshake {
-    pub const SERVER_HANDSHAKE: u8 = 0;
+    pub const SERVER_HANDSHAKE: u8 = 0x00;
 }
 
 pub mod status {
-    pub const CLIENT_STATUS: u8 = 0;
-    pub const CLIENT_PING: u8 = 1;
-    pub const SERVER_STATUS: u8 = 0;
-    pub const SERVER_PING: u8 = 1;
+    pub const CLIENT_STATUS: u8 = 0x0;
+    pub const CLIENT_PING: u8 = 0x01;
+    pub const SERVER_STATUS: u8 = 0x00;
+    pub const SERVER_PING: u8 = 0x01;
 }
 
 pub mod login {
