@@ -17,7 +17,7 @@ use crate::types;
 /// Having a packet ID and a raw data byte array.
 pub struct RawPacket {
     /// Packet ID.
-    pub id: i32,
+    pub id: u8,
 
     /// Packet data.
     pub data: Vec<u8>,
@@ -25,7 +25,7 @@ pub struct RawPacket {
 
 impl RawPacket {
     /// Construct new raw packet.
-    pub fn new(id: i32, data: Vec<u8>) -> Self {
+    pub fn new(id: u8, data: Vec<u8>) -> Self {
         Self { id, data }
     }
 
@@ -35,7 +35,7 @@ impl RawPacket {
         let (read, packet_id) = types::read_var_int(buf)?;
         buf = &buf[read..];
 
-        Ok(Self::new(packet_id, buf.to_vec()))
+        Ok(Self::new(packet_id as u8, buf.to_vec()))
     }
 
     /// Decode packet from raw buffer.
@@ -95,7 +95,7 @@ impl RawPacket {
     /// Encode compressed packet to raw buffer.
     fn encode_compressed(&self, threshold: i32) -> Result<Vec<u8>, ()> {
         // Packet payload: packet ID and data buffer
-        let mut payload = types::encode_var_int(self.id)?;
+        let mut payload = types::encode_var_int(self.id as i32)?;
         payload.extend_from_slice(&self.data);
 
         // Determine whether to compress, encode data length bytes
@@ -126,7 +126,7 @@ impl RawPacket {
 
     /// Encode uncompressed packet to raw buffer.
     fn encode_uncompressed(&self) -> Result<Vec<u8>, ()> {
-        let mut data = types::encode_var_int(self.id)?;
+        let mut data = types::encode_var_int(self.id as i32)?;
         data.extend_from_slice(&self.data);
 
         let len = data.len() as i32;
