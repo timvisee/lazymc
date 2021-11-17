@@ -103,7 +103,7 @@ fn watch(server: &Server, path: &Path) -> bool {
         // Reload banned IPs
         if reload {
             info!(target: "lazymc", "Reloading list of banned IPs...");
-            match ban::load(&path) {
+            match ban::load(path) {
                 Ok(ips) => server.set_banned_ips_blocking(ips),
                 Err(err) => {
                     error!(target: "lazymc", "Failed reload list of banned IPs from {}: {}", ban::FILE, err);

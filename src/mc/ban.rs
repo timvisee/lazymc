@@ -72,7 +72,7 @@ impl BannedIp {
         }
 
         // Parse expiry time, check if it has passed
-        let expiry = match DateTime::parse_from_str(&expires, "%Y-%m-%d %H:%M:%S %z") {
+        let expiry = match DateTime::parse_from_str(expires, "%Y-%m-%d %H:%M:%S %z") {
             Ok(expiry) => expiry,
             Err(err) => {
                 error!(target: "lazymc", "Failed to parse ban expiry '{}', assuming still banned: {}", expires, err);
