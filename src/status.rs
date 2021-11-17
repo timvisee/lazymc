@@ -19,6 +19,9 @@ use crate::proto::packet::{self, RawPacket};
 use crate::proto::packets;
 use crate::server::{self, Server};
 
+/// The ban message prefix.
+const BAN_MESSAGE_PREFIX: &str = "Your IP address is banned from this server.\nReason: ";
+
 /// Default ban reason if unknown.
 const DEFAULT_BAN_REASON: &str = "Banned by an operator.";
 
@@ -133,13 +136,19 @@ pub async fn serve(
             // Kick if client is banned
             if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
                 if ban.is_banned() {
-                    if let Some(reason) = ban.reason {
+                    let msg = if let Some(reason) = ban.reason {
                         info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &reason);
-                        action::kick(&client, &reason, &mut writer).await?;
+                        reason.to_string()
                     } else {
                         info!(target: "lazymc", "Login from banned IP {}, disconnecting", client.peer.ip());
-                        action::kick(&client, DEFAULT_BAN_REASON, &mut writer).await?;
-                    }
+                        DEFAULT_BAN_REASON.to_string()
+                    };
+                    action::kick(
+                        &client,
+                        &format!("{}{}", BAN_MESSAGE_PREFIX, msg),
+                        &mut writer,
+                    )
+                    .await?;
                     break;
                 }
             }

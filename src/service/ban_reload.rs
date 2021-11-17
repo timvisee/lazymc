@@ -11,7 +11,7 @@ use crate::mc::ban;
 use crate::server::Server;
 
 /// File debounce time.
-const WATCH_DEBOUNCE: Duration = Duration::from_secs(1);
+const WATCH_DEBOUNCE: Duration = Duration::from_secs(2);
 
 /// Service to reload banned IPs when its file changes.
 pub fn service(config: Arc<Config>, server: Arc<Server>) {
