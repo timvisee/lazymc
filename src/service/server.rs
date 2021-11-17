@@ -6,6 +6,7 @@ use futures::FutureExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
+use crate::mc::ban::{self, BannedIp};
 use crate::proto::client::Client;
 use crate::proxy;
 use crate::server::{self, Server};
@@ -22,6 +23,9 @@ use crate::util::error::{quit_error, ErrorHints};
 pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     // Load server state
     let server = Arc::new(Server::default());
+
+    // Load banned IPs
+    server.set_banned_ips(load_banned_ips(&config)).await;
 
     // Listen for new connections
     let listener = TcpListener::bind(config.public.address)
@@ -66,12 +70,41 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
 /// Route inbound TCP stream to correct service, spawning a new task.
 #[inline]
 fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
+    // Check ban
+    if !check_ban(&inbound, &server) {
+        return;
+    }
+
+    // Route connection through proper channel
     let should_proxy = server.state() == server::State::Started && !config.lockout.enabled;
     if should_proxy {
         route_proxy(inbound, config)
     } else {
         route_status(inbound, config, server)
     }
+}
+
+/// Check whether user IP is banned.
+///
+/// Returns `true` if user is still allowed to connect.
+fn check_ban(inbound: &TcpStream, server: &Server) -> bool {
+    // Get user peer address
+    let peer = match inbound.peer_addr() {
+        Ok(peer) => peer,
+        Err(err) => {
+            warn!(target: "lazymc", "Connection from unknown peer, disconnecting: {}", err);
+            return false;
+        }
+    };
+
+    // Check if user is banned
+    let is_banned = server.is_banned_ip_blocking(&peer.ip());
+    if is_banned {
+        warn!(target: "lazymc", "Connection from banned IP {}, disconnecting", peer);
+        return false;
+    }
+
+    true
 }
 
 /// Route inbound TCP stream to status server, spawning a new task.
@@ -122,4 +155,42 @@ pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: By
     };
 
     tokio::spawn(service);
+}
+
+/// Load banned IPs if IP banning is enabled.
+///
+/// If disabled or on error, an empty list is returned.
+fn load_banned_ips(config: &Config) -> Vec<BannedIp> {
+    // Blocking banned IPs must be enabled
+    if !config.server.block_banned_ips {
+        return vec![];
+    }
+
+    // Ensure server directory is set, it must exist
+    let dir = match &config.server.directory {
+        Some(dir) => dir,
+        None => {
+            warn!(target: "lazymc", "Not blocking banned IPs, server directory not configured, unable to find {} file", ban::FILE);
+            return vec![];
+        }
+    };
+
+    // Determine file path, ensure it exists
+    let path = dir.join(crate::mc::ban::FILE);
+    if !path.is_file() {
+        warn!(target: "lazymc", "Not blocking banned IPs, {} file does not exist", ban::FILE);
+        return vec![];
+    }
+
+    // Load banned IPs
+    let banned_ips = match ban::load(&path) {
+        Ok(ips) => ips,
+        Err(err) => {
+            // TODO: quit here, require user to disable feature as security feature?
+            error!(target: "lazymc", "Failed to load banned IPs from {}: {}", ban::FILE, err);
+            return vec![];
+        }
+    };
+
+    banned_ips
 }

@@ -180,6 +180,10 @@ pub struct Server {
     /// Server stopping timeout. Force kill server process if it takes longer.
     #[serde(default = "u32_150")]
     pub stop_timeout: u32,
+
+    /// Block banned IPs as listed in banned-ips.json in server directory.
+    #[serde(default = "bool_true")]
+    pub block_banned_ips: bool,
 }
 
 /// Time configuration.
@@ -450,4 +454,8 @@ fn u32_300() -> u32 {
 
 fn u32_150() -> u32 {
     300
+}
+
+fn bool_true() -> bool {
+    true
 }

@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -12,6 +13,7 @@ use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 use tokio::time;
 
 use crate::config::Config;
+use crate::mc::ban::BannedIp;
 use crate::os;
 
 /// Server cooldown after the process quit.
@@ -24,45 +26,6 @@ const SERVER_QUIT_COOLDOWN: Duration = Duration::from_millis(2500);
 /// improve reliability.
 #[cfg(feature = "rcon")]
 const RCON_COOLDOWN: Duration = Duration::from_secs(15);
-
-/// Server state.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum State {
-    /// Server is stopped.
-    Stopped,
-
-    /// Server is starting.
-    Starting,
-
-    /// Server is online and responding.
-    Started,
-
-    /// Server is stopping.
-    Stopping,
-}
-
-impl State {
-    /// From u8, panics if invalid.
-    pub fn from_u8(state: u8) -> Self {
-        match state {
-            0 => Self::Stopped,
-            1 => Self::Starting,
-            2 => Self::Started,
-            3 => Self::Stopping,
-            _ => panic!("invalid State u8"),
-        }
-    }
-
-    /// To u8.
-    pub fn to_u8(self) -> u8 {
-        match self {
-            Self::Stopped => 0,
-            Self::Starting => 1,
-            Self::Started => 2,
-            Self::Stopping => 3,
-        }
-    }
-}
 
 /// Shared server state.
 #[derive(Debug)]
@@ -101,6 +64,9 @@ pub struct Server {
     ///
     /// Used as starting/stopping timeout.
     kill_at: RwLock<Option<Instant>>,
+
+    /// List of banned IPs.
+    banned_ips: RwLock<Vec<BannedIp>>,
 
     /// Lock for exclusive RCON operations.
     #[cfg(feature = "rcon")]
@@ -345,6 +311,27 @@ impl Server {
             .filter(|d| *d > 0)
             .map(|d| Instant::now() + Duration::from_secs(d as u64));
     }
+
+    /// Check whether the given IP is banned.
+    ///
+    /// This uses the latest known `banned-ips.json` contents if known.
+    /// If this feature is disabled, this will always return false.
+    pub async fn is_banned_ip(&self, ip: &IpAddr) -> bool {
+        self.banned_ips.read().await.iter().any(|i| &i.ip == ip)
+    }
+
+    /// Check whether the given IP is banned.
+    ///
+    /// This uses the latest known `banned-ips.json` contents if known.
+    /// If this feature is disabled, this will always return false.
+    pub fn is_banned_ip_blocking(&self, ip: &IpAddr) -> bool {
+        futures::executor::block_on(async { self.is_banned_ip(ip).await })
+    }
+
+    /// Update the list of banned IPs.
+    pub async fn set_banned_ips(&self, ips: Vec<BannedIp>) {
+        *self.banned_ips.write().await = ips;
+    }
 }
 
 impl Default for Server {
@@ -360,10 +347,50 @@ impl Default for Server {
             last_active: Default::default(),
             keep_online_until: Default::default(),
             kill_at: Default::default(),
+            banned_ips: Default::default(),
             #[cfg(feature = "rcon")]
             rcon_lock: Semaphore::new(1),
             #[cfg(feature = "rcon")]
             rcon_last_stop: Default::default(),
+        }
+    }
+}
+
+/// Server state.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum State {
+    /// Server is stopped.
+    Stopped,
+
+    /// Server is starting.
+    Starting,
+
+    /// Server is online and responding.
+    Started,
+
+    /// Server is stopping.
+    Stopping,
+}
+
+impl State {
+    /// From u8, panics if invalid.
+    pub fn from_u8(state: u8) -> Self {
+        match state {
+            0 => Self::Stopped,
+            1 => Self::Starting,
+            2 => Self::Started,
+            3 => Self::Stopping,
+            _ => panic!("invalid State u8"),
+        }
+    }
+
+    /// To u8.
+    pub fn to_u8(self) -> u8 {
+        match self {
+            Self::Stopped => 0,
+            Self::Starting => 1,
+            Self::Started => 2,
+            Self::Stopping => 3,
         }
     }
 }
