@@ -6,7 +6,6 @@ use futures::FutureExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
-use crate::mc::ban::{self, BannedIps};
 use crate::proto::client::Client;
 use crate::proxy;
 use crate::server::{self, Server};
@@ -23,9 +22,6 @@ use crate::util::error::{quit_error, ErrorHints};
 pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     // Load server state
     let server = Arc::new(Server::default());
-
-    // Load banned IPs
-    server.set_banned_ips(load_banned_ips(&config)).await;
 
     // Listen for new connections
     let listener = TcpListener::bind(config.public.address)
@@ -53,6 +49,10 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     // Spawn server monitor and signal handler services
     tokio::spawn(service::monitor::service(config.clone(), server.clone()));
     tokio::spawn(service::signal::service(config.clone(), server.clone()));
+    tokio::task::spawn_blocking({
+        let (config, server) = (config.clone(), server.clone());
+        || service::ban_reload::service(config, server)
+    });
 
     // Initiate server start
     if config.server.wake_on_start {
@@ -144,42 +144,4 @@ pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: By
     };
 
     tokio::spawn(service);
-}
-
-/// Load banned IPs if IP banning is enabled.
-///
-/// If disabled or on error, an empty list is returned.
-fn load_banned_ips(config: &Config) -> BannedIps {
-    // Blocking banned IPs must be enabled
-    if !config.server.block_banned_ips && !config.server.drop_banned_ips {
-        return BannedIps::default();
-    }
-
-    // Ensure server directory is set, it must exist
-    let dir = match &config.server.directory {
-        Some(dir) => dir,
-        None => {
-            warn!(target: "lazymc", "Not blocking banned IPs, server directory not configured, unable to find {} file", ban::FILE);
-            return BannedIps::default();
-        }
-    };
-
-    // Determine file path, ensure it exists
-    let path = dir.join(crate::mc::ban::FILE);
-    if !path.is_file() {
-        warn!(target: "lazymc", "Not blocking banned IPs, {} file does not exist", ban::FILE);
-        return BannedIps::default();
-    }
-
-    // Load banned IPs
-    let banned_ips = match ban::load(&path) {
-        Ok(ips) => ips,
-        Err(err) => {
-            // TODO: quit here, require user to disable feature as security feature?
-            error!(target: "lazymc", "Failed to load banned IPs from {}: {}", ban::FILE, err);
-            return BannedIps::default();
-        }
-    };
-
-    banned_ips
 }

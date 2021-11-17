@@ -337,6 +337,11 @@ impl Server {
     pub async fn set_banned_ips(&self, ips: BannedIps) {
         *self.banned_ips.write().await = ips;
     }
+
+    /// Update the list of banned IPs.
+    pub fn set_banned_ips_blocking(&self, ips: BannedIps) {
+        futures::executor::block_on(async { self.set_banned_ips(ips).await })
+    }
 }
 
 impl Default for Server {

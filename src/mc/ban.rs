@@ -89,9 +89,11 @@ pub fn load(path: &Path) -> Result<BannedIps, Box<dyn Error>> {
     // Load file contents
     let contents = fs::read_to_string(path)?;
 
-    // Parse contents, transform into map
+    // Parse contents
     let ips: Vec<BannedIp> = serde_json::from_str(&contents)?;
-    let ips = ips.into_iter().map(|ip| (ip.ip, ip)).collect();
+    debug!(target: "lazymc", "Loaded {} banned IPs", ips.len());
 
+    // Transform into map
+    let ips = ips.into_iter().map(|ip| (ip.ip, ip)).collect();
     Ok(BannedIps { ips })
 }
