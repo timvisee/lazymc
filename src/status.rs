@@ -130,7 +130,7 @@ pub async fn serve(
             // Kick if client is banned
             if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
                 if ban.is_banned() {
-                    warn!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &ban.reason);
+                    info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &ban.reason);
                     action::kick(&client, &ban.reason, &mut writer).await?;
                     break;
                 }
@@ -177,6 +177,12 @@ pub async fn serve(
 /// Build server status object to respond to client with.
 async fn server_status(config: &Config, server: &Server) -> ServerStatus {
     let status = server.status().await;
+    let server_state = server.state();
+
+    // Respond with real server status if started
+    if server_state == server::State::Started && status.is_some() {
+        return status.as_ref().unwrap().clone();
+    }
 
     // Select version and player max from last known server status
     let (version, max) = match status.as_ref() {
@@ -195,7 +201,7 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
         if config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
-            Message::new(Payload::text(match server.state() {
+            Message::new(Payload::text(match server_state {
                 server::State::Stopped | server::State::Started => &config.motd.sleeping,
                 server::State::Starting => &config.motd.starting,
                 server::State::Stopping => &config.motd.stopping,
