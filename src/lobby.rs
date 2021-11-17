@@ -588,10 +588,14 @@ async fn connect_to_server_no_timeout(
         .await
         .map_err(|_| ())?;
 
-    let (mut reader, mut writer) = outbound.split();
-
-    let tmp_client = Client::default();
+    // Construct temporary server client
+    let tmp_client = match outbound.local_addr() {
+        Ok(addr) => Client::new(addr),
+        Err(_) => Client::dummy(),
+    };
     tmp_client.set_state(ClientState::Login);
+
+    let (mut reader, mut writer) = outbound.split();
 
     // Handshake packet
     packet::write_packet(

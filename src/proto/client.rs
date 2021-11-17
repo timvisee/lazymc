@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
@@ -6,6 +7,9 @@ use std::sync::Mutex;
 /// Note: this does not keep track of encryption states.
 #[derive(Debug)]
 pub struct Client {
+    /// Client peer address.
+    pub peer: SocketAddr,
+
     /// Current client state.
     pub state: Mutex<ClientState>,
 
@@ -16,6 +20,20 @@ pub struct Client {
 }
 
 impl Client {
+    /// Construct new client with given peer address.
+    pub fn new(peer: SocketAddr) -> Self {
+        Self {
+            peer,
+            state: Default::default(),
+            compression: AtomicI32::new(-1),
+        }
+    }
+
+    /// Construct dummy client.
+    pub fn dummy() -> Self {
+        Self::new("0.0.0.0:0".parse().unwrap())
+    }
+
     /// Get client state.
     pub fn state(&self) -> ClientState {
         *self.state.lock().unwrap()
@@ -41,15 +59,6 @@ impl Client {
     pub fn set_compression(&self, threshold: i32) {
         trace!(target: "lazymc", "Client now uses compression threshold of {}", threshold);
         self.compression.store(threshold, Ordering::Relaxed);
-    }
-}
-
-impl Default for Client {
-    fn default() -> Self {
-        Self {
-            state: Default::default(),
-            compression: AtomicI32::new(-1),
-        }
     }
 }
 

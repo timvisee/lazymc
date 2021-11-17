@@ -70,48 +70,33 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
 /// Route inbound TCP stream to correct service, spawning a new task.
 #[inline]
 fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
-    // Check ban
-    if !check_ban(&inbound, &server) {
-        return;
-    }
-
-    // Route connection through proper channel
-    let should_proxy = server.state() == server::State::Started && !config.lockout.enabled;
-    if should_proxy {
-        route_proxy(inbound, config)
-    } else {
-        route_status(inbound, config, server)
-    }
-}
-
-/// Check whether user IP is banned.
-///
-/// Returns `true` if user is still allowed to connect.
-fn check_ban(inbound: &TcpStream, server: &Server) -> bool {
     // Get user peer address
     let peer = match inbound.peer_addr() {
         Ok(peer) => peer,
         Err(err) => {
-            warn!(target: "lazymc", "Connection from unknown peer, disconnecting: {}", err);
-            return false;
+            warn!(target: "lazymc", "Connection from unknown peer address, disconnecting: {}", err);
+            return;
         }
     };
 
-    // Check if user is banned
-    let is_banned = server.is_banned_ip_blocking(&peer.ip());
-    if is_banned {
-        warn!(target: "lazymc", "Connection from banned IP {}, disconnecting", peer);
-        return false;
-    }
+    // Check ban state
+    let banned = server.is_banned_ip_blocking(&peer.ip());
 
-    true
+    // Route connection through proper channel
+    let should_proxy =
+        !banned && server.state() == server::State::Started && !config.lockout.enabled;
+    if should_proxy {
+        route_proxy(inbound, config)
+    } else {
+        route_status(inbound, config, server, peer)
+    }
 }
 
 /// Route inbound TCP stream to status server, spawning a new task.
 #[inline]
-fn route_status(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
+fn route_status(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>, peer: SocketAddr) {
     // When server is not online, spawn a status server
-    let client = Client::default();
+    let client = Client::new(peer);
     let service = status::serve(client, inbound, config, server).map(|r| {
         if let Err(err) = r {
             warn!(target: "lazymc", "Failed to serve status: {:?}", err);

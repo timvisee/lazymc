@@ -98,7 +98,7 @@ async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus,
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
     // Dummy client
-    let client = Client::default();
+    let client = Client::dummy();
 
     send_handshake(&client, &mut stream, config, addr).await?;
     request_status(&client, &mut stream).await?;
@@ -110,7 +110,7 @@ async fn do_ping(config: &Config, addr: SocketAddr) -> Result<(), ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
     // Dummy client
-    let client = Client::default();
+    let client = Client::dummy();
 
     send_handshake(&client, &mut stream, config, addr).await?;
     let token = send_ping(&client, &mut stream).await?;

@@ -127,6 +127,15 @@ pub async fn serve(
                 break;
             }
 
+            // Kick if client is banned
+            if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
+                if ban.is_banned() {
+                    warn!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &ban.reason);
+                    action::kick(&client, &ban.reason, &mut writer).await?;
+                    break;
+                }
+            }
+
             // Start server if not starting yet
             Server::start(config.clone(), server.clone(), username).await;
 

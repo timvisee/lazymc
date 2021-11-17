@@ -17,6 +17,14 @@ pub struct BannedIps {
 }
 
 impl BannedIps {
+    /// Get ban entry if IP if it exists.
+    ///
+    /// This uses the latest known `banned-ips.json` contents if known.
+    /// If this feature is disabled, this will always return false.
+    pub fn get(&self, ip: &IpAddr) -> Option<BannedIp> {
+        self.ips.get(ip).cloned()
+    }
+
     /// Check whether the given IP is banned.
     ///
     /// This uses the latest known `banned-ips.json` contents if known.
@@ -27,7 +35,7 @@ impl BannedIps {
 }
 
 /// A banned IP entry.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BannedIp {
     /// Banned IP.
     pub ip: IpAddr,

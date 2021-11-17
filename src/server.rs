@@ -13,7 +13,7 @@ use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 use tokio::time;
 
 use crate::config::Config;
-use crate::mc::ban::BannedIps;
+use crate::mc::ban::{BannedIp, BannedIps};
 use crate::os;
 
 /// Server cooldown after the process quit.
@@ -318,6 +318,11 @@ impl Server {
     /// If this feature is disabled, this will always return false.
     pub async fn is_banned_ip(&self, ip: &IpAddr) -> bool {
         self.banned_ips.read().await.is_banned(ip)
+    }
+
+    /// Get user ban entry.
+    pub async fn ban_entry(&self, ip: &IpAddr) -> Option<BannedIp> {
+        self.banned_ips.read().await.get(ip)
     }
 
     /// Check whether the given IP is banned.
