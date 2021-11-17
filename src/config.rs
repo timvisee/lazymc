@@ -184,6 +184,10 @@ pub struct Server {
     /// Block banned IPs as listed in banned-ips.json in server directory.
     #[serde(default = "bool_true")]
     pub block_banned_ips: bool,
+
+    /// Drop connections from banned IPs.
+    #[serde(default)]
+    pub drop_banned_ips: bool,
 }
 
 /// Time configuration.

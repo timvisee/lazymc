@@ -79,8 +79,12 @@ fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
         }
     };
 
-    // Check ban state
+    // Check ban state, just drop connection if enabled
     let banned = server.is_banned_ip_blocking(&peer.ip());
+    if config.server.drop_banned_ips {
+        warn!(target: "lazymc", "Connection from banned IP {}, dropping", peer.ip());
+        return;
+    }
 
     // Route connection through proper channel
     let should_proxy =
@@ -147,7 +151,7 @@ pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: By
 /// If disabled or on error, an empty list is returned.
 fn load_banned_ips(config: &Config) -> BannedIps {
     // Blocking banned IPs must be enabled
-    if !config.server.block_banned_ips {
+    if !config.server.block_banned_ips && !config.server.drop_banned_ips {
         return BannedIps::default();
     }
 
