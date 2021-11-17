@@ -4,10 +4,14 @@ use std::fs;
 use std::net::IpAddr;
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 /// File name.
 pub const FILE: &str = "banned-ips.json";
+
+/// The forever expiry literal.
+const EXPIRY_FOREVER: &str = "forever";
 
 /// List of banned IPs.
 #[derive(Debug, Default)]
@@ -56,8 +60,21 @@ pub struct BannedIp {
 impl BannedIp {
     /// Check if this entry is currently banned.
     pub fn is_banned(&self) -> bool {
-        // TODO: check expiry date here!
-        true
+        // If expiry is forever, the user is banned
+        if self.expires.trim().to_lowercase() == EXPIRY_FOREVER {
+            return true;
+        }
+
+        // Parse expiry time, check if it has passed
+        let expiry = match DateTime::parse_from_str(&self.expires, "%Y-%m-%d %H:%M:%S %z") {
+            Ok(expiry) => expiry,
+            Err(err) => {
+                error!(target: "lazymc", "Failed to parse ban expiry '{}', assuming still banned: {}", self.expires, err);
+                return true;
+            }
+        };
+
+        expiry > Utc::now()
     }
 }
 

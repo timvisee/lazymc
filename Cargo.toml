@@ -47,6 +47,7 @@ serde = "1.0"
 serde_json = "1.0"
 shlex = "1.1"
 thiserror = "1.0"
+chrono = "0.4"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "io-util", "net", "macros", "time", "process", "signal", "sync"] }
 toml = "0.5"
 version-compare = "0.1"
