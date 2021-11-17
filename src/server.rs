@@ -13,7 +13,7 @@ use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 use tokio::time;
 
 use crate::config::Config;
-use crate::mc::ban::BannedIp;
+use crate::mc::ban::BannedIps;
 use crate::os;
 
 /// Server cooldown after the process quit.
@@ -66,7 +66,7 @@ pub struct Server {
     kill_at: RwLock<Option<Instant>>,
 
     /// List of banned IPs.
-    banned_ips: RwLock<Vec<BannedIp>>,
+    banned_ips: RwLock<BannedIps>,
 
     /// Lock for exclusive RCON operations.
     #[cfg(feature = "rcon")]
@@ -317,7 +317,7 @@ impl Server {
     /// This uses the latest known `banned-ips.json` contents if known.
     /// If this feature is disabled, this will always return false.
     pub async fn is_banned_ip(&self, ip: &IpAddr) -> bool {
-        self.banned_ips.read().await.iter().any(|i| &i.ip == ip)
+        self.banned_ips.read().await.is_banned(ip)
     }
 
     /// Check whether the given IP is banned.
@@ -329,7 +329,7 @@ impl Server {
     }
 
     /// Update the list of banned IPs.
-    pub async fn set_banned_ips(&self, ips: Vec<BannedIp>) {
+    pub async fn set_banned_ips(&self, ips: BannedIps) {
         *self.banned_ips.write().await = ips;
     }
 }

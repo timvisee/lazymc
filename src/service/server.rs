@@ -6,7 +6,7 @@ use futures::FutureExt;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
-use crate::mc::ban::{self, BannedIp};
+use crate::mc::ban::{self, BannedIps};
 use crate::proto::client::Client;
 use crate::proxy;
 use crate::server::{self, Server};
@@ -160,10 +160,10 @@ pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: By
 /// Load banned IPs if IP banning is enabled.
 ///
 /// If disabled or on error, an empty list is returned.
-fn load_banned_ips(config: &Config) -> Vec<BannedIp> {
+fn load_banned_ips(config: &Config) -> BannedIps {
     // Blocking banned IPs must be enabled
     if !config.server.block_banned_ips {
-        return vec![];
+        return BannedIps::default();
     }
 
     // Ensure server directory is set, it must exist
@@ -171,7 +171,7 @@ fn load_banned_ips(config: &Config) -> Vec<BannedIp> {
         Some(dir) => dir,
         None => {
             warn!(target: "lazymc", "Not blocking banned IPs, server directory not configured, unable to find {} file", ban::FILE);
-            return vec![];
+            return BannedIps::default();
         }
     };
 
@@ -179,7 +179,7 @@ fn load_banned_ips(config: &Config) -> Vec<BannedIp> {
     let path = dir.join(crate::mc::ban::FILE);
     if !path.is_file() {
         warn!(target: "lazymc", "Not blocking banned IPs, {} file does not exist", ban::FILE);
-        return vec![];
+        return BannedIps::default();
     }
 
     // Load banned IPs
@@ -188,7 +188,7 @@ fn load_banned_ips(config: &Config) -> Vec<BannedIp> {
         Err(err) => {
             // TODO: quit here, require user to disable feature as security feature?
             error!(target: "lazymc", "Failed to load banned IPs from {}: {}", ban::FILE, err);
-            return vec![];
+            return BannedIps::default();
         }
     };
 

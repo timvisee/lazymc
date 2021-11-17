@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::net::IpAddr;
@@ -7,6 +8,23 @@ use serde::Deserialize;
 
 /// File name.
 pub const FILE: &str = "banned-ips.json";
+
+/// List of banned IPs.
+#[derive(Debug, Default)]
+pub struct BannedIps {
+    /// List of banned IPs.
+    ips: HashMap<IpAddr, BannedIp>,
+}
+
+impl BannedIps {
+    /// Check whether the given IP is banned.
+    ///
+    /// This uses the latest known `banned-ips.json` contents if known.
+    /// If this feature is disabled, this will always return false.
+    pub fn is_banned(&self, ip: &IpAddr) -> bool {
+        self.ips.get(ip).map(|ip| ip.is_banned()).unwrap_or(false)
+    }
+}
 
 /// A banned IP entry.
 #[derive(Debug, Deserialize)]
@@ -27,11 +45,22 @@ pub struct BannedIp {
     pub reason: String,
 }
 
+impl BannedIp {
+    /// Check if this entry is currently banned.
+    pub fn is_banned(&self) -> bool {
+        // TODO: check expiry date here!
+        true
+    }
+}
+
 /// Load banned IPs from file.
-pub fn load(path: &Path) -> Result<Vec<BannedIp>, Box<dyn Error>> {
+pub fn load(path: &Path) -> Result<BannedIps, Box<dyn Error>> {
     // Load file contents
     let contents = fs::read_to_string(path)?;
 
-    // Parse contents
-    Ok(serde_json::from_str(&contents)?)
+    // Parse contents, transform into map
+    let ips: Vec<BannedIp> = serde_json::from_str(&contents)?;
+    let ips = ips.into_iter().map(|ip| (ip.ip, ip)).collect();
+
+    Ok(BannedIps { ips })
 }
