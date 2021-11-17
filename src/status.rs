@@ -19,6 +19,9 @@ use crate::proto::packet::{self, RawPacket};
 use crate::proto::packets;
 use crate::server::{self, Server};
 
+/// Default ban reason if unknown.
+const DEFAULT_BAN_REASON: &str = "Banned by an operator.";
+
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
 pub async fn serve(
@@ -130,8 +133,13 @@ pub async fn serve(
             // Kick if client is banned
             if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
                 if ban.is_banned() {
-                    info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &ban.reason);
-                    action::kick(&client, &ban.reason, &mut writer).await?;
+                    if let Some(reason) = ban.reason {
+                        info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &reason);
+                        action::kick(&client, &reason, &mut writer).await?;
+                    } else {
+                        info!(target: "lazymc", "Login from banned IP {}, disconnecting", client.peer.ip());
+                        action::kick(&client, DEFAULT_BAN_REASON, &mut writer).await?;
+                    }
                     break;
                 }
             }

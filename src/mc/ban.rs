@@ -45,31 +45,37 @@ pub struct BannedIp {
     pub ip: IpAddr,
 
     /// Ban creation time.
-    pub created: String,
+    pub created: Option<String>,
 
     /// Ban source.
-    pub source: String,
+    pub source: Option<String>,
 
     /// Ban expiry time.
-    pub expires: String,
+    pub expires: Option<String>,
 
     /// Ban reason.
-    pub reason: String,
+    pub reason: Option<String>,
 }
 
 impl BannedIp {
     /// Check if this entry is currently banned.
     pub fn is_banned(&self) -> bool {
+        // Get expiry time
+        let expires = match &self.expires {
+            Some(expires) => expires,
+            None => return true,
+        };
+
         // If expiry is forever, the user is banned
-        if self.expires.trim().to_lowercase() == EXPIRY_FOREVER {
+        if expires.trim().to_lowercase() == EXPIRY_FOREVER {
             return true;
         }
 
         // Parse expiry time, check if it has passed
-        let expiry = match DateTime::parse_from_str(&self.expires, "%Y-%m-%d %H:%M:%S %z") {
+        let expiry = match DateTime::parse_from_str(&expires, "%Y-%m-%d %H:%M:%S %z") {
             Ok(expiry) => expiry,
             Err(err) => {
-                error!(target: "lazymc", "Failed to parse ban expiry '{}', assuming still banned: {}", self.expires, err);
+                error!(target: "lazymc", "Failed to parse ban expiry '{}', assuming still banned: {}", expires, err);
                 return true;
             }
         };
