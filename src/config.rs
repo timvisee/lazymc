@@ -9,6 +9,7 @@ use version_compare::Cmp;
 
 use crate::proto;
 use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
+use crate::util::serde::to_socket_addrs;
 
 /// Default configuration file location.
 pub const CONFIG_FILE: &str = "lazymc.toml";
@@ -127,6 +128,7 @@ impl Config {
 #[serde(default)]
 pub struct Public {
     /// Public address.
+    #[serde(deserialize_with = "to_socket_addrs")]
     pub address: SocketAddr,
 
     /// Minecraft protocol version name hint.
@@ -157,7 +159,10 @@ pub struct Server {
     pub command: String,
 
     /// Server address.
-    #[serde(default = "server_address_default")]
+    #[serde(
+        deserialize_with = "to_socket_addrs",
+        default = "server_address_default"
+    )]
     pub address: SocketAddr,
 
     /// Immediately wake server when starting lazymc.
@@ -318,6 +323,7 @@ impl Default for JoinHold {
 #[serde(default)]
 pub struct JoinForward {
     /// IP and port to forward to.
+    #[serde(deserialize_with = "to_socket_addrs")]
     pub address: SocketAddr,
 }
 

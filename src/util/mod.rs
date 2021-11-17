@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod error;
+pub mod serde;
 pub mod style;
 
 use std::env;
