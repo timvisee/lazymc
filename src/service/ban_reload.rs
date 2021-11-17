@@ -46,6 +46,12 @@ pub fn service(config: Arc<Config>, server: Arc<Server>) {
         }
     }
 
+    // Show warning if 127.0.0.1 is banned
+    if server.is_banned_ip_blocking(&("127.0.0.1".parse().unwrap())) {
+        warn!(target: "lazymc", "Local address 127.0.0.1 IP banned, probably not what you want");
+        warn!(target: "lazymc", "Use '/pardon-ip 127.0.0.1' on the server to unban");
+    }
+
     // Keep watching
     while watch(&server, &path) {}
 }

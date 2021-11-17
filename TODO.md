@@ -4,6 +4,7 @@
 - Resolve TODOs in code
 - Don't drop errors, handle everywhere where needed (some were dropped while
   prototyping to speed up development)
+- Spigot/paper plugin to get real player IP from lazymc, reimplement ban-ip
 
 ## Nice to have
 
