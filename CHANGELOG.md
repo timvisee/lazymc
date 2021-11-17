@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2021-11-17)
+
+- Add support for using host names in config address fields
+- Handle banned players within `lazymc` based on server `banned-ips.json`
+- Update dependencies
+
 ## 0.2.0 (2021-11-15)
 
 - Add lockout feature, enable to kick all connecting clients with a message

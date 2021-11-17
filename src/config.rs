@@ -15,7 +15,7 @@ use crate::util::serde::to_socket_addrs;
 pub const CONFIG_FILE: &str = "lazymc.toml";
 
 /// Configuration version user should be using, or warning will be shown.
-const CONFIG_VERSION: &str = "0.2.0";
+const CONFIG_VERSION: &str = "0.2.1";
 
 /// Load config from file, based on CLI arguments.
 ///
