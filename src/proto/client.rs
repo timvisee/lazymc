@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
+use minecraft_protocol::version::v1_14_4::handshake::Handshake;
+
 /// Client state.
 ///
 /// Note: this does not keep track of encryption states.
@@ -113,8 +115,8 @@ impl Default for ClientState {
 /// Client info, useful during connection handling.
 #[derive(Debug, Clone, Default)]
 pub struct ClientInfo {
-    /// Client protocol version.
-    pub protocol_version: Option<i32>,
+    /// Handshake as received from client.
+    pub handshake: Option<Handshake>,
 
     /// Client username.
     pub username: Option<String>,

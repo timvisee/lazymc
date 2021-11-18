@@ -8,7 +8,6 @@ use bytes::BytesMut;
 use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::decoder::Decoder;
-use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess, SetCompression};
 use minecraft_protocol::version::v1_17_1::game::{
     ClientBoundKeepAlive, ClientBoundPluginMessage, JoinGame, NamedSoundEffect,
@@ -608,18 +607,13 @@ async fn connect_to_server_no_timeout(
 
     let (mut reader, mut writer) = outbound.split();
 
-    // Handshake packet
-    packet::write_packet(
-        Handshake {
-            protocol_version: client_info.protocol_version.unwrap(),
-            server_addr: config.server.address.ip().to_string(),
-            server_port: config.server.address.port(),
-            next_state: ClientState::Login.to_id(),
-        },
-        &tmp_client,
-        &mut writer,
-    )
-    .await?;
+    // Replay client handshake packet
+    assert_eq!(
+        client_info.handshake.as_ref().unwrap().next_state,
+        ClientState::Login.to_id(),
+        "Client handshake should have login as next state"
+    );
+    packet::write_packet(client_info.handshake.unwrap(), &tmp_client, &mut writer).await?;
 
     // Request login start
     packet::write_packet(

@@ -84,9 +84,7 @@ pub async fn serve(
             };
 
             // Update client info and client state
-            client_info
-                .protocol_version
-                .replace(handshake.protocol_version);
+            client_info.handshake.replace(handshake);
             client.set_state(new_state);
 
             // If loggin in with handshake, remember inbound
