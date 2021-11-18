@@ -8,6 +8,7 @@ use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::LoginStart;
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -24,6 +25,9 @@ const BAN_MESSAGE_PREFIX: &str = "Your IP address is banned from this server.\nR
 
 /// Default ban reason if unknown.
 const DEFAULT_BAN_REASON: &str = "Banned by an operator.";
+
+/// Server icon file path.
+const SERVER_ICON_FILE: &str = "server-icon.png";
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
@@ -226,6 +230,13 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
         }
     };
 
+    // Get server favicon
+    let favicon = if config.motd.from_server && status.is_some() {
+        status.as_ref().unwrap().favicon.clone()
+    } else {
+        favicon(&config).await
+    };
+
     // Build status resposne
     ServerStatus {
         version,
@@ -235,5 +246,36 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
             max,
             sample: vec![],
         },
+        favicon,
     }
+}
+
+/// Get server status favicon.
+async fn favicon(config: &Config) -> Option<String> {
+    // Get server dir
+    let dir = match config.server.directory.as_ref() {
+        Some(dir) => dir,
+        None => return None,
+    };
+
+    // Server icon file, ensure it exists
+    let path = dir.join(SERVER_ICON_FILE);
+    if !path.is_file() {
+        return None;
+    }
+
+    // Read icon data
+    let data = fs::read(path)
+        .await
+        .map_err(|err| {
+            error!(target: "lazymc", "Failed to read favicon from {}: {}", SERVER_ICON_FILE, err);
+        })
+        .ok()?;
+
+    // Format and return favicon
+    Some(format!(
+        "{}{}",
+        "data:image/png;base64,",
+        base64::encode(data)
+    ))
 }
