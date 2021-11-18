@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2021-11-18)
+
+- Add server favicon to status response
+
 ## 0.2.1 (2021-11-17)
 
 - Add support for using host names in config address fields
