@@ -4,6 +4,7 @@ use bytes::BytesMut;
 use tokio::net::TcpStream;
 
 use crate::config::*;
+use crate::proxy::ProxyHeader;
 use crate::service;
 
 use super::MethodResult;
@@ -20,6 +21,7 @@ pub async fn occupy(
 
     service::server::route_proxy_address_queue(
         inbound,
+        ProxyHeader::Proxy.not_none(config.join.forward.send_proxy_v2),
         config.join.forward.address,
         inbound_history.clone(),
     );

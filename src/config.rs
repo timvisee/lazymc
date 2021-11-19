@@ -188,6 +188,10 @@ pub struct Server {
     /// Drop connections from banned IPs.
     #[serde(default)]
     pub drop_banned_ips: bool,
+
+    /// Add HAProxy v2 header to proxied connections.
+    #[serde(default)]
+    pub send_proxy_v2: bool,
 }
 
 /// Time configuration.
@@ -333,12 +337,17 @@ pub struct JoinForward {
     /// IP and port to forward to.
     #[serde(deserialize_with = "to_socket_addrs")]
     pub address: SocketAddr,
+
+    /// Add HAProxy v2 header to proxied connections.
+    #[serde(default)]
+    pub send_proxy_v2: bool,
 }
 
 impl Default for JoinForward {
     fn default() -> Self {
         Self {
             address: "127.0.0.1:25565".parse().unwrap(),
+            send_proxy_v2: false,
         }
     }
 }

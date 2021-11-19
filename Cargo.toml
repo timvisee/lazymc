@@ -45,6 +45,7 @@ log = "0.4"
 minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "356ea54" }
 notify = "4.0"
 pretty_env_logger = "0.4"
+proxy-protocol = "0.5"
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"

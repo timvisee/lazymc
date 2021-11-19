@@ -1,5 +1,6 @@
 # TODO
 
+- Describe `send_proxy_v2` usage on docs page
 - Better organize code
 - Resolve TODOs in code
 - Don't drop errors, handle everywhere where needed (some were dropped while

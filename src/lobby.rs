@@ -15,6 +15,7 @@ use minecraft_protocol::version::v1_17_1::game::{
     PlayerPositionAndLook, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
 use nbt::CompoundTag;
+use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
@@ -128,7 +129,10 @@ pub async fn serve(
             // Wait for server to come online, then set up new connection to it
             stage_wait(client, &server, &config, &mut writer).await?;
             let (server_client, mut outbound, mut server_buf) =
-                connect_to_server(client_info, &config).await?;
+                connect_to_server(client_info, &inbound, &config).await?;
+            let (returned_reader, returned_writer) = inbound.split();
+            reader = returned_reader;
+            writer = returned_writer;
 
             // Grab join game packet from server
             let join_game =
@@ -562,11 +566,12 @@ async fn wait_for_server(server: &Server, config: &Config) -> Result<(), ()> {
 /// This will initialize the connection to the play state. Client details are used.
 async fn connect_to_server(
     client_info: ClientInfo,
+    inbound: &TcpStream,
     config: &Config,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
     time::timeout(
         SERVER_CONNECT_TIMEOUT,
-        connect_to_server_no_timeout(client_info, config),
+        connect_to_server_no_timeout(client_info, inbound, config),
     )
     .await
     .map_err(|_| {
@@ -580,6 +585,7 @@ async fn connect_to_server(
 // TODO: clean this up
 async fn connect_to_server_no_timeout(
     client_info: ClientInfo,
+    inbound: &TcpStream,
     config: &Config,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
     // Open connection
@@ -587,6 +593,15 @@ async fn connect_to_server_no_timeout(
     let mut outbound = TcpStream::connect(config.server.address)
         .await
         .map_err(|_| ())?;
+
+    // Add proxy header
+    if config.server.send_proxy_v2 {
+        trace!(target: "lazymc::lobby", "Sending local proxy header for server connection");
+        outbound
+            .write_all(&proxy::stream_proxy_header(inbound).map_err(|_| ())?)
+            .await
+            .map_err(|_| ())?;
+    }
 
     // Construct temporary server client
     let tmp_client = match outbound.local_addr() {

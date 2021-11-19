@@ -7,7 +7,7 @@ use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
 use crate::proto::client::Client;
-use crate::proxy;
+use crate::proxy::{self, ProxyHeader};
 use crate::server::{self, Server};
 use crate::service;
 use crate::status;
@@ -114,7 +114,12 @@ fn route_status(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>, pe
 #[inline]
 fn route_proxy(inbound: TcpStream, config: Arc<Config>) {
     // When server is online, proxy all
-    let service = proxy::proxy(inbound, config.server.address).map(|r| {
+    let service = proxy::proxy(
+        inbound,
+        ProxyHeader::Proxy.not_none(config.server.send_proxy_v2),
+        config.server.address,
+    )
+    .map(|r| {
         if let Err(err) = r {
             warn!(target: "lazymc", "Failed to proxy: {}", err);
         }
@@ -126,15 +131,25 @@ fn route_proxy(inbound: TcpStream, config: Arc<Config>) {
 /// Route inbound TCP stream to proxy with queued data, spawning a new task.
 #[inline]
 pub fn route_proxy_queue(inbound: TcpStream, config: Arc<Config>, queue: BytesMut) {
-    route_proxy_address_queue(inbound, config.server.address, queue);
+    route_proxy_address_queue(
+        inbound,
+        ProxyHeader::Proxy.not_none(config.server.send_proxy_v2),
+        config.server.address,
+        queue,
+    );
 }
 
 /// Route inbound TCP stream to proxy with given address and queued data, spawning a new task.
 #[inline]
-pub fn route_proxy_address_queue(inbound: TcpStream, addr: SocketAddr, queue: BytesMut) {
+pub fn route_proxy_address_queue(
+    inbound: TcpStream,
+    proxy_header: ProxyHeader,
+    addr: SocketAddr,
+    queue: BytesMut,
+) {
     // When server is online, proxy all
     let service = async move {
-        proxy::proxy_with_queue(inbound, addr, &queue)
+        proxy::proxy_with_queue(inbound, proxy_header, addr, &queue)
             .map(|r| {
                 if let Err(err) = r {
                     warn!(target: "lazymc", "Failed to proxy: {}", err);
