@@ -57,7 +57,7 @@ version-compare = "0.1"
 
 # Feature: rcon
 rust_rcon = { package = "rcon", version = "0.5.2", optional = true }
-async-std = { version = "1.9.0", deafult-features = false, optional = true }
+async-std = { version = "1.9.0", default-features = false, optional = true }
 
 # Feature: lobby
 md-5 = { version = "0.9", optional = true }
