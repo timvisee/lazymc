@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 (2021-11-22)
+
+- Add support for `PROXY` header to notify Minecraft server of real client IP
+- Only enable RCON by default on Windows
+- Update dependencies
+
 ## 0.2.2 (2021-11-18)
 
 - Add server favicon to status response
