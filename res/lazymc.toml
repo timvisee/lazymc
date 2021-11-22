@@ -147,7 +147,7 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 [rcon]
 # Enable sleeping server through RCON.
 # Must be enabled on Windows.
-#enabled = true
+#enabled = false # default: false, true on Windows
 
 # Server RCON port. Must differ from public and server port.
 #port = 25575

@@ -418,7 +418,7 @@ pub struct Rcon {
 impl Default for Rcon {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: cfg!(windows),
             port: 25575,
             password: "".into(),
             randomize_password: true,
