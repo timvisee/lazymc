@@ -44,7 +44,8 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 - Customizable MOTD and login messages
 - Automatically manages `server.properties` (host, port and RCON settings)
 - Automatically block banned IPs from server within `lazymc`
-- Graceful server sleep/shutdown through RCON (with `SIGTERM` fallback on Linux/Unix)
+- Graceful server sleep/shutdown through RCON or `SIGTERM`
+- Real client IP on Minecraft server with `PROXY` header ([usage](./docs/proxy-ip.md))
 - Restart server on crash
 - Lockout mode
 
