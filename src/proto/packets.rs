@@ -17,7 +17,9 @@ pub mod login {
     pub const CLIENT_DISCONNECT: u8 = 0x00;
     pub const CLIENT_LOGIN_SUCCESS: u8 = 0x02;
     pub const CLIENT_SET_COMPRESSION: u8 = 0x03;
+    pub const CLIENT_LOGIN_PLUGIN_REQUEST: u8 = 0x04;
     pub const SERVER_LOGIN_START: u8 = 0x00;
+    pub const SERVER_LOGIN_PLUGIN_RESPONSE: u8 = 0x02;
 }
 
 pub mod play {
@@ -35,7 +37,18 @@ pub mod play {
     pub const CLIENT_SET_TITLE_TEXT: u8 = 0x59;
     pub const CLIENT_SET_TITLE_TIMES: u8 = 0x5A;
     pub const SERVER_CLIENT_SETTINGS: u8 = 0x05;
-    pub const SERVER_PLUGIN_MESSAGE: u8 = 0x0A;
+    // TODO: update
+    pub const SERVER_PLUGIN_MESSAGE: u8 = 0x0B; //0A
     pub const SERVER_PLAYER_POS: u8 = 0x11;
     pub const SERVER_PLAYER_POS_ROT: u8 = 0x12;
+}
+
+pub mod forge {
+    pub mod login {
+        pub const CLIENT_MOD_LIST: u8 = 1;
+        pub const CLIENT_SERVER_REGISTRY: u8 = 3;
+        pub const CLIENT_CONFIG_DATA: u8 = 4;
+        pub const SERVER_MOD_LIST_REPLY: u8 = 2;
+        pub const SERVER_ACKNOWLEDGEMENT: u8 = 99;
+    }
 }

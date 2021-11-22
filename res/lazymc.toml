@@ -39,6 +39,9 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Immediately wake server after crash.
 #wake_on_crash = false
 
+# Set to true if this server runs Forge.
+#forge = false
+
 # Server start/stop timeout in seconds. Force kill server process if it takes too long.
 #start_timeout = 300
 #stop_timeout = 150

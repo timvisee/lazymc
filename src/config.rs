@@ -182,6 +182,10 @@ pub struct Server {
     #[serde(default)]
     pub wake_on_crash: bool,
 
+    /// Whether this server runs forge.
+    #[serde(default)]
+    pub forge: bool,
+
     /// Server starting timeout. Force kill server process if it takes longer.
     #[serde(default = "u32_300")]
     pub start_timeout: u32,

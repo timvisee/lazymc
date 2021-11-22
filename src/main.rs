@@ -10,6 +10,7 @@ extern crate log;
 pub(crate) mod action;
 pub(crate) mod cli;
 pub(crate) mod config;
+pub(crate) mod forge;
 pub(crate) mod join;
 #[cfg(feature = "lobby")]
 pub(crate) mod lobby;
@@ -17,6 +18,7 @@ pub(crate) mod mc;
 pub(crate) mod monitor;
 pub(crate) mod net;
 pub(crate) mod os;
+pub(crate) mod probe;
 pub(crate) mod proto;
 pub(crate) mod proxy;
 pub(crate) mod server;

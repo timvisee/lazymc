@@ -103,7 +103,7 @@ pub async fn serve(
             let mut data = Vec::new();
             packet.encode(&mut data).map_err(|_| ())?;
 
-            let response = RawPacket::new(0, data).encode(&client)?;
+            let response = RawPacket::new(0, data).encode_with_len(&client)?;
             writer.write_all(&response).await.map_err(|_| ())?;
 
             continue;

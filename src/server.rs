@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
+use minecraft_protocol::version::v1_17_1::game::JoinGame;
 use tokio::process::Command;
 use tokio::sync::watch;
 #[cfg(feature = "rcon")]
@@ -79,6 +80,11 @@ pub struct Server {
     /// Last time server was stopped over RCON.
     #[cfg(feature = "rcon")]
     rcon_last_stop: Mutex<Option<Instant>>,
+
+    // TODO: dont use mutex, do not make public, dont use bytesmut
+    pub forge_payload: Mutex<Vec<Vec<u8>>>,
+    // TODO: dont use mutex, do not make public, dont use bytesmut
+    pub probed_join_game: Mutex<Option<JoinGame>>,
 }
 
 impl Server {
@@ -366,6 +372,8 @@ impl Default for Server {
             rcon_lock: Semaphore::new(1),
             #[cfg(feature = "rcon")]
             rcon_last_stop: Default::default(),
+            forge_payload: Default::default(),
+            probed_join_game: Default::default(),
         }
     }
 }

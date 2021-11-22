@@ -8,12 +8,20 @@ use bytes::BytesMut;
 use futures::FutureExt;
 use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::decoder::Decoder;
-use minecraft_protocol::version::v1_14_4::login::{LoginStart, LoginSuccess, SetCompression};
+use minecraft_protocol::version::forge_v1_13::login::LoginWrapper;
+use minecraft_protocol::version::v1_14_4::login::{
+    LoginDisconnect, LoginPluginRequest, LoginPluginResponse, LoginStart, LoginSuccess,
+    SetCompression,
+};
+use minecraft_protocol::version::v1_16_5::game::{Title, TitleAction};
 use minecraft_protocol::version::v1_17_1::game::{
     ClientBoundKeepAlive, ClientBoundPluginMessage, JoinGame, NamedSoundEffect,
     PlayerPositionAndLook, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
 };
+use minecraft_protocol::version::PacketId;
 use nbt::CompoundTag;
+use proto::packet::RawPacket;
+use rand::Rng;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -21,6 +29,7 @@ use tokio::select;
 use tokio::time;
 
 use crate::config::*;
+use crate::forge;
 use crate::mc::{self, uuid};
 use crate::net;
 use crate::proto;
@@ -107,6 +116,15 @@ pub async fn serve(
             let login_start = LoginStart::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
             debug!(target: "lazymc::lobby", "Login on lobby server (user: {})", login_start.name);
+
+            // Replay Forge payload
+            if config.server.forge {
+                forge::replay_login_payload(client, &mut inbound, server.clone(), &mut inbound_buf)
+                    .await?;
+                let (returned_reader, returned_writer) = inbound.split();
+                reader = returned_reader;
+                writer = returned_writer;
+            }
 
             // Respond with set compression if compression is enabled based on threshold
             if proto::COMPRESSION_THRESHOLD >= 0 {
@@ -255,11 +273,18 @@ async fn send_lobby_join_game(
     writer: &mut WriteHalf<'_>,
     server: &Server,
 ) -> Result<(), ()> {
+    // Grab probed dimension codec
+    let dimension_codec: CompoundTag =
+        if let Some(ref join_game) = server.probed_join_game.lock().await.as_ref() {
+            join_game.dimension_codec.clone()
+        } else {
+            snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt"))
+        };
+
     // Send Minecrafts default states, slightly customised for lobby world
     packet::write_packet(
         {
             let status = server.status().await;
-
             JoinGame {
                 // Player ID must be unique, if it collides with another server entity ID the player gets
                 // in a weird state and cannot move
@@ -273,7 +298,7 @@ async fn send_lobby_join_game(
                     "minecraft:the_nether".into(),
                     "minecraft:the_end".into(),
                 ],
-                dimension_codec: snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt")),
+                dimension_codec,
                 dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
                 world_name: "lazymc:lobby".into(),
                 hashed_seed: 0,
@@ -647,9 +672,7 @@ async fn connect_to_server_no_timeout(
         {
             // Decode compression packet
             let set_compression =
-                SetCompression::decode(&mut packet.data.as_slice()).map_err(|err| {
-                    dbg!(err);
-                })?;
+                SetCompression::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
 
             // Client and server compression threshold should match, show warning if not
             if set_compression.threshold != proto::COMPRESSION_THRESHOLD {
@@ -663,6 +686,27 @@ async fn connect_to_server_no_timeout(
 
             // Set client compression
             tmp_client.set_compression(set_compression.threshold);
+            continue;
+        }
+
+        // Hijack login plugin request
+        if client_state == ClientState::Login
+            && packet.id == packets::login::CLIENT_LOGIN_PLUGIN_REQUEST
+        {
+            // TODO: update message if not on forge
+            trace!(target: "lazymc::lobby", "Received login plugin request from server, assuming we should send Forge payload now");
+
+            // Decode login plugin request
+            let plugin_request =
+                LoginPluginRequest::decode(&mut packet.data.as_slice()).map_err(|err| {
+                    dbg!(err);
+                })?;
+
+            // Respond to Forge login plugin request
+            forge::respond_login_plugin_request(&tmp_client, plugin_request, &mut writer).await?;
+
+            // TODO: if not on forge, respond with empty payload because we don't understand
+
             continue;
         }
 
@@ -687,6 +731,24 @@ async fn connect_to_server_no_timeout(
 
             return Ok((tmp_client, outbound, buf));
         }
+
+        // Hijack disconnect
+        if client_state == ClientState::Login && packet.id == packets::login::CLIENT_DISCONNECT {
+            error!(target: "lazymc::lobby", "Received disconnect from server connection");
+
+            // // Decode disconnect packet
+            // let login_disconnect =
+            //     LoginDisconnect::decode(&mut packet.data.as_slice()).map_err(|err| {
+            //         dbg!(err);
+            //     })?;
+
+            // TODO: report/forward error to client
+
+            break;
+        }
+
+        // TODO: if receiving encryption request, disconnect with error because we don't support
+        // online mode!
 
         // Show unhandled packet warning
         debug!(target: "lazymc::lobby", "Received unhandled packet from server in connect_to_server:");
@@ -799,7 +861,6 @@ async fn drain_stream(reader: &mut ReadHalf<'_>) -> Result<(), ()> {
 
 /// Read NBT CompoundTag from SNBT.
 fn snbt_to_compound_tag(data: &str) -> CompoundTag {
-    use nbt::decode::read_compound_tag;
     use quartz_nbt::io::{write_nbt, Flavor};
     use quartz_nbt::snbt;
 
@@ -812,5 +873,11 @@ fn snbt_to_compound_tag(data: &str) -> CompoundTag {
         .expect("failed to encode NBT CompoundTag as binary");
 
     // Parse binary with usable NBT create
-    read_compound_tag(&mut &*binary).unwrap()
+    bin_to_compound_tag(&mut &*binary)
+}
+
+/// Read NBT CompoundTag from SNBT.
+fn bin_to_compound_tag(data: &[u8]) -> CompoundTag {
+    use nbt::decode::read_compound_tag;
+    read_compound_tag(&mut &*data).unwrap()
 }

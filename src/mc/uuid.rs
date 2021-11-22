@@ -5,7 +5,7 @@ use uuid::Uuid;
 const OFFLINE_PLAYER_NAMESPACE: &str = "OfflinePlayer:";
 
 /// Get UUID for given player username.
-pub fn player_uuid(username: &str) -> Uuid {
+fn player_uuid(username: &str) -> Uuid {
     java_name_uuid_from_bytes(username.as_bytes())
 }
 

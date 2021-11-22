@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::io::prelude::*;
 
 use bytes::BytesMut;
@@ -44,11 +45,22 @@ impl RawPacket {
     ///
     /// This decodes both compressed and uncompressed packets based on the client threshold
     /// preference.
-    pub fn decode(client: &Client, mut buf: &[u8]) -> Result<Self, ()> {
+    pub fn decode_with_len(client: &Client, mut buf: &[u8]) -> Result<Self, ()> {
         // Read length
         let (read, len) = types::read_var_int(buf)?;
         buf = &buf[read..][..len as usize];
 
+        // TODO: assert buffer length!
+
+        Self::decode_without_len(client, buf)
+    }
+
+    /// Decode packet from raw buffer without packet length.
+    ///
+    /// This decodes both compressed and uncompressed packets based on the client threshold
+    /// preference.
+    /// The length is given, and not included in the buffer itself.
+    pub fn decode_without_len(client: &Client, mut buf: &[u8]) -> Result<Self, ()> {
         // If no compression is used, read remaining packet ID and data
         if !client.is_compressed() {
             // Read packet ID and data
@@ -85,7 +97,20 @@ impl RawPacket {
     /// Encode packet to raw buffer.
     ///
     /// This compresses packets based on the client threshold preference.
-    pub fn encode(&self, client: &Client) -> Result<Vec<u8>, ()> {
+    pub fn encode_with_len(&self, client: &Client) -> Result<Vec<u8>, ()> {
+        // Encode packet without length
+        let mut payload = self.encode_without_len(client)?;
+
+        // Add length header
+        let mut packet = types::encode_var_int(payload.len() as i32)?;
+        packet.append(&mut payload);
+        Ok(packet)
+    }
+
+    /// Encode packet to raw buffer without length header.
+    ///
+    /// This compresses packets based on the client threshold preference.
+    pub fn encode_without_len(&self, client: &Client) -> Result<Vec<u8>, ()> {
         let threshold = client.compressed();
         if threshold >= 0 {
             self.encode_compressed(threshold)
@@ -103,8 +128,7 @@ impl RawPacket {
         // Determine whether to compress, encode data length bytes
         let data_len = payload.len() as i32;
         let compress = data_len > threshold;
-        let mut data_len_bytes =
-            types::encode_var_int(if compress { data_len } else { 0 }).unwrap();
+        let data_len_header = if compress { data_len } else { 0 };
 
         // Compress payload
         if compress {
@@ -117,10 +141,8 @@ impl RawPacket {
             })?;
         }
 
-        // Encapsulate payload with packet and data length
-        let len = data_len_bytes.len() as i32 + payload.len() as i32;
-        let mut packet = types::encode_var_int(len)?;
-        packet.append(&mut data_len_bytes);
+        // Add data length header
+        let mut packet = types::encode_var_int(data_len_header).unwrap();
         packet.append(&mut payload);
 
         Ok(packet)
@@ -128,12 +150,8 @@ impl RawPacket {
 
     /// Encode uncompressed packet to raw buffer.
     fn encode_uncompressed(&self) -> Result<Vec<u8>, ()> {
-        let mut data = types::encode_var_int(self.id as i32)?;
-        data.extend_from_slice(&self.data);
-
-        let len = data.len() as i32;
-        let mut packet = types::encode_var_int(len)?;
-        packet.append(&mut data);
+        let mut packet = types::encode_var_int(self.id as i32)?;
+        packet.extend_from_slice(&self.data);
 
         Ok(packet)
     }
@@ -194,22 +212,23 @@ pub async fn read_packet(
     }
 
     // Parse packet, use full buffer since we'll read the packet length again
+    // TODO: use decode_without_len, strip len from buffer
     let raw = buf.split_to(consumed + len as usize);
-    let packet = RawPacket::decode(client, &raw)?;
+    let packet = RawPacket::decode_with_len(client, &raw)?;
 
     Ok(Some((packet, raw.to_vec())))
 }
 
 /// Write packet to stream writer.
 pub async fn write_packet(
-    packet: impl PacketId + Encoder,
+    packet: impl PacketId + Encoder + Debug,
     client: &Client,
     writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     let mut data = Vec::new();
     packet.encode(&mut data).map_err(|_| ())?;
 
-    let response = RawPacket::new(packet.packet_id(), data).encode(client)?;
+    let response = RawPacket::new(packet.packet_id(), data).encode_with_len(client)?;
     writer.write_all(&response).await.map_err(|_| ())?;
 
     Ok(())
