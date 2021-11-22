@@ -1,4 +1,6 @@
 pub mod ban;
+#[cfg(feature = "lobby")]
+pub mod dimension;
 pub mod favicon;
 #[cfg(feature = "rcon")]
 pub mod rcon;

@@ -30,7 +30,7 @@ use tokio::time;
 
 use crate::config::*;
 use crate::forge;
-use crate::mc::{self, uuid};
+use crate::mc::{self, dimension, uuid};
 use crate::net;
 use crate::proto;
 use crate::proto::client::{Client, ClientInfo, ClientState};
@@ -273,13 +273,14 @@ async fn send_lobby_join_game(
     writer: &mut WriteHalf<'_>,
     server: &Server,
 ) -> Result<(), ()> {
-    // Grab probed dimension codec
+    // Get dimension codec and build lobby dimension
     let dimension_codec: CompoundTag =
         if let Some(ref join_game) = server.probed_join_game.lock().await.as_ref() {
             join_game.dimension_codec.clone()
         } else {
-            snbt_to_compound_tag(include_str!("../res/dimension_codec.snbt"))
+            dimension::lobby_default_dimension_codec()
         };
+    let dimension: CompoundTag = dimension::lobby_dimension(&dimension_codec);
 
     // Send Minecrafts default states, slightly customised for lobby world
     packet::write_packet(
@@ -299,7 +300,7 @@ async fn send_lobby_join_game(
                     "minecraft:the_end".into(),
                 ],
                 dimension_codec,
-                dimension: snbt_to_compound_tag(include_str!("../res/dimension.snbt")),
+                dimension,
                 world_name: "lazymc:lobby".into(),
                 hashed_seed: 0,
                 max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
@@ -857,27 +858,4 @@ async fn drain_stream(reader: &mut ReadHalf<'_>) -> Result<(), ()> {
             }
         }
     }
-}
-
-/// Read NBT CompoundTag from SNBT.
-fn snbt_to_compound_tag(data: &str) -> CompoundTag {
-    use quartz_nbt::io::{write_nbt, Flavor};
-    use quartz_nbt::snbt;
-
-    // Parse SNBT data
-    let compound = snbt::parse(data).expect("failed to parse SNBT");
-
-    // Encode to binary
-    let mut binary = Vec::new();
-    write_nbt(&mut binary, None, &compound, Flavor::Uncompressed)
-        .expect("failed to encode NBT CompoundTag as binary");
-
-    // Parse binary with usable NBT create
-    bin_to_compound_tag(&mut &*binary)
-}
-
-/// Read NBT CompoundTag from SNBT.
-fn bin_to_compound_tag(data: &[u8]) -> CompoundTag {
-    use nbt::decode::read_compound_tag;
-    read_compound_tag(&mut &*data).unwrap()
 }
