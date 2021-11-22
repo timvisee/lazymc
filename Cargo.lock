@@ -1295,8 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "rcon"
-version = "0.5.1"
-source = "git+https://github.com/timvisee/rust-rcon?rev=6fc6726#6fc67266e2e026aa52a2ce14bfb30ed69ec5b241"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b7fdd146f86bd90fa2d4cf83a28b45f058e90bcf11ed0cce134e757928771e6"
 dependencies = [
  "async-std",
  "bytes",
