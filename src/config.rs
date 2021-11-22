@@ -182,6 +182,10 @@ pub struct Server {
     #[serde(default)]
     pub wake_on_crash: bool,
 
+    /// Probe required server details when starting lazymc, wakes server on start.
+    #[serde(default)]
+    pub probe_on_start: bool,
+
     /// Whether this server runs forge.
     #[serde(default)]
     pub forge: bool,

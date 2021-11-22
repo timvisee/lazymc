@@ -46,19 +46,21 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         );
     }
 
-    // Spawn server monitor, signal handler, probe and ban services
+    // Spawn services: monitor, signal handler
     tokio::spawn(service::monitor::service(config.clone(), server.clone()));
     tokio::spawn(service::signal::service(config.clone(), server.clone()));
-    tokio::spawn(service::probe::service(config.clone(), server.clone()));
-    tokio::task::spawn_blocking({
-        let (config, server) = (config.clone(), server.clone());
-        || service::ban_reload::service(config, server)
-    });
 
     // Initiate server start
     if config.server.wake_on_start {
         Server::start(config.clone(), server.clone(), None).await;
     }
+
+    // Spawn additional services: probe and ban manager
+    tokio::spawn(service::probe::service(config.clone(), server.clone()));
+    tokio::task::spawn_blocking({
+        let (config, server) = (config.clone(), server.clone());
+        || service::ban_reload::service(config, server)
+    });
 
     // Route all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {

@@ -40,7 +40,7 @@ pub async fn probe(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
 
     // Start server if not starting already
     if Server::start(config.clone(), server.clone(), None).await {
-        warn!(target: "lazymc::probe", "Starting server to probe required details...");
+        info!(target: "lazymc::probe", "Starting server to probe...");
     }
 
     // Wait for server to come online
