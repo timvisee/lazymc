@@ -23,7 +23,7 @@ Current limitations:
 
 - Only works with offline mode
 - Only works with vanilla Minecraft clients, does not work with modded (e.g. Forge, FTB)
-- Probably only works with Minecraft 1.16-1.17.1 (tested with 1.17.1)
+- Probably only works with Minecraft 1.17-1.17.1 (tested with 1.17.1)
 - This method will consume the client, following configured join methods won't be used.
 
 At this time it is unknown if some of the above limitations will ever be lifted,

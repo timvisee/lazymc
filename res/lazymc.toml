@@ -127,8 +127,8 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Don't enable this unless you know what you're doing.
 #
 # - Only works with offline mode
+# - Only works with Minecraft 1.17-1.17.1 (tested with 1.17.1)
 # - Only works with vanilla Minecraft clients, does not work with modded
-# - Only tested with Minecraft 1.17.1
 
 # Maximum time in seconds in the lobby while the server starts.
 #timeout = 600
