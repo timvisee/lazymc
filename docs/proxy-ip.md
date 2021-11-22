@@ -1,7 +1,7 @@
 # Proxy IP
 
 lazymc acts as a proxy most of the time. Because of this the Minecraft server
-will think all clients connect from the same IP, being the IP `lazymc` proxies
+will think all clients connect from the same IP, being the IP lazymc proxies
 from.
 
 This breaks IP banning (`/ban-ip`, amongst other IP related things). This may be
@@ -49,7 +49,8 @@ Other related properties, you probably won't need to touch, include:
 ## Server plugin
 
 Install one of these plugins as companion on your server to enable support for
-the `PROXY` header.
+the `PROXY` header. This requires Minecraft server software supporting plugins,
+the vanilla Minecraft server does not support this.
 
 If lazymc connects to a Spigot compatible server, use any of:
 

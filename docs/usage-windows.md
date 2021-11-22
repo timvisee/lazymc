@@ -31,15 +31,11 @@ notepad lazymc.toml
 .\lazymc start
 ```
 
-Before you use this in production, please ensure starting and stopping the
-server works as expected by connecting to it once. Watch `lazymc`s output while
-it starts and stops. If stopping results in errors, fix this first to prevent
-corrupting world/user data.
+Please see [extras](./extras.md) for recommendations and additional things
+to set up (e.g. how to fix incorrect client IPs and IP banning on your server).
 
-Follow this repository with the _Watch_ button on the top right to be notified of new releases.
-
-Everything should now be ready to go! Connect with your Minecraft client to wake
-your server up!
+After you've read through the [extras](./extras.md), everything should now
+be ready to go! Connect with your Minecraft client to wake your server up!
 
 _Note: if you put `lazymc` in `PATH`, or if you
 [install](../README.md#compile-from-source) it through Cargo, you can invoke
