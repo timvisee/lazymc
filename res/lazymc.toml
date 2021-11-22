@@ -8,7 +8,7 @@
 # You can probably leave the rest as-is.
 #
 # You may generate a new configuration with: lazymc config generate
-# Or find the latest at: https://is.gd/WWBIQu
+# Or find the latest at: https://git.io/J1Fvq
 
 [public]
 # Public address. IP and port users connect to.
@@ -17,7 +17,7 @@
 
 # Server version & protocol hint.
 # Sent to clients until actual server version is known.
-# See: https://is.gd/FTQKTP
+# See: https://git.io/J1Fvx
 #version = "1.17.1"
 #protocol = 756
 
@@ -30,7 +30,7 @@
 directory = "."
 
 # Command to start the server.
-# Warning: if using a bash script read: https://is.gd/k8SQYv
+# Warning: if using a bash script read: https://git.io/J1FvZ
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
 # Immediately wake server when starting lazymc.
