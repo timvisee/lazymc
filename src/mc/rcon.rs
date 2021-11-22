@@ -1,7 +1,12 @@
 use std::time::Duration;
 
+use async_std::net::TcpStream;
+use async_std::prelude::*;
 use rust_rcon::{Connection, Error as RconError};
 use tokio::time;
+
+use crate::config::Config;
+use crate::proxy;
 
 /// Minecraft RCON quirk.
 ///
@@ -17,14 +22,37 @@ pub struct Rcon {
 
 impl Rcon {
     /// Connect to a host.
-    pub async fn connect(addr: &str, pass: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn connect(
+        config: &Config,
+        addr: &str,
+        pass: &str,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        // Connect to our TCP stream
+        let mut stream = TcpStream::connect(addr).await?;
+
+        // Add proxy header
+        if config.rcon.send_proxy_v2 {
+            trace!(target: "lazymc::rcon", "Sending local proxy header for RCON connection");
+            stream.write_all(&proxy::local_proxy_header()?).await?;
+        }
+
         // Start connection
         let con = Connection::builder()
             .enable_minecraft_quirks(true)
-            .connect(addr, pass)
+            .connect_stream(stream, pass)
             .await?;
 
         Ok(Self { con })
+    }
+
+    /// Connect to a host from the given configuration.
+    pub async fn connect_config(config: &Config) -> Result<Self, Box<dyn std::error::Error>> {
+        // RCON address
+        let mut addr = config.server.address;
+        addr.set_port(config.rcon.port);
+        let addr = addr.to_string();
+
+        Self::connect(config, &addr, &config.rcon.password).await
     }
 
     /// Send command over RCON.

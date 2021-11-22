@@ -410,6 +410,9 @@ pub struct Rcon {
 
     /// Randomize server RCON password on each start.
     pub randomize_password: bool,
+
+    /// Add HAProxy v2 header to RCON connections.
+    pub send_proxy_v2: bool,
 }
 
 impl Default for Rcon {
@@ -419,6 +422,7 @@ impl Default for Rcon {
             port: 25575,
             password: "".into(),
             randomize_password: true,
+            send_proxy_v2: false,
         }
     }
 }

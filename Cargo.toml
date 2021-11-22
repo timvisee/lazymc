@@ -24,7 +24,7 @@ default = ["rcon", "lobby"]
 # RCON support
 # Allow use of RCON to manage (stop) server.
 # Required on Windows.
-rcon = ["rust_rcon"]
+rcon = ["rust_rcon", "async-std"]
 
 # Lobby support
 # Add lobby join method, keeps client in fake lobby world until server is ready.
@@ -56,7 +56,8 @@ toml = "0.5"
 version-compare = "0.1"
 
 # Feature: rcon
-rust_rcon = { package = "rcon", version = "0.5", optional = true }
+rust_rcon = { package = "rcon", git = "https://github.com/timvisee/rust-rcon", rev = "6fc6726", optional = true }
+async-std = { version = "1.9.0", deafult-features = false, optional = true }
 
 # Feature: lobby
 named-binary-tag = { version = "0.6", optional = true }

@@ -762,6 +762,7 @@ name = "lazymc"
 version = "0.2.2"
 dependencies = [
  "anyhow",
+ "async-std",
  "base64",
  "bytes",
  "chrono",
@@ -1295,8 +1296,7 @@ dependencies = [
 [[package]]
 name = "rcon"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "465a6f903164a399084787547a026b83e7937bc576d8acdbd9e41ebf5de90a85"
+source = "git+https://github.com/timvisee/rust-rcon?rev=6fc6726#6fc67266e2e026aa52a2ce14bfb30ed69ec5b241"
 dependencies = [
  "async-std",
  "bytes",

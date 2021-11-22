@@ -498,13 +498,8 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
         return false;
     }
 
-    // RCON address
-    let mut addr = config.server.address;
-    addr.set_port(config.rcon.port);
-    let addr = addr.to_string();
-
     // Create RCON client
-    let mut rcon = match Rcon::connect(&addr, &config.rcon.password).await {
+    let mut rcon = match Rcon::connect_config(&config).await {
         Ok(rcon) => rcon,
         Err(err) => {
             error!(target: "lazymc", "Failed to RCON server to sleep: {}", err);
@@ -522,10 +517,10 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
     server.rcon_last_stop.lock().await.replace(Instant::now());
     server.update_state(State::Stopping, config).await;
 
-    drop(rcon_lock);
-
     // Gracefully close connection
     rcon.close().await;
+
+    drop(rcon_lock);
 
     true
 }
