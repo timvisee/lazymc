@@ -1,5 +1,3 @@
-// TODO: remove all unwraps/expects here!
-
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,12 +10,14 @@ use minecraft_protocol::version::v1_14_4::status::{
     PingRequest, PingResponse, StatusRequest, StatusResponse,
 };
 use rand::Rng;
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
 use crate::proto::client::{Client, ClientState};
 use crate::proto::{packet, packets};
+use crate::proxy;
 use crate::server::{Server, State};
 
 /// Monitor ping inverval in seconds.
@@ -97,6 +97,15 @@ pub async fn poll_server(
 async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus, ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
 
+    // Add proxy header
+    if config.server.send_proxy_v2 {
+        trace!(target: "lazymc::monitor", "Sending local proxy header for server connection");
+        stream
+            .write_all(&proxy::local_proxy_header().map_err(|_| ())?)
+            .await
+            .map_err(|_| ())?;
+    }
+
     // Dummy client
     let client = Client::dummy();
 
@@ -108,6 +117,15 @@ async fn fetch_status(config: &Config, addr: SocketAddr) -> Result<ServerStatus,
 /// Attemp to ping server.
 async fn do_ping(config: &Config, addr: SocketAddr) -> Result<(), ()> {
     let mut stream = TcpStream::connect(addr).await.map_err(|_| ())?;
+
+    // Add proxy header
+    if config.server.send_proxy_v2 {
+        trace!(target: "lazymc::monitor", "Sending local proxy header for server connection");
+        stream
+            .write_all(&proxy::local_proxy_header().map_err(|_| ())?)
+            .await
+            .map_err(|_| ())?;
+    }
 
     // Dummy client
     let client = Client::dummy();

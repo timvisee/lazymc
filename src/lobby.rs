@@ -596,7 +596,7 @@ async fn connect_to_server_no_timeout(
 
     // Add proxy header
     if config.server.send_proxy_v2 {
-        trace!(target: "lazymc::lobby", "Sending local proxy header for server connection");
+        trace!(target: "lazymc::lobby", "Sending client proxy header for server connection");
         outbound
             .write_all(&proxy::stream_proxy_header(inbound).map_err(|_| ())?)
             .await
