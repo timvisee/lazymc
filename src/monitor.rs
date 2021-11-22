@@ -27,7 +27,7 @@ const MONITOR_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const STATUS_TIMEOUT: u64 = 20;
 
 /// Ping request timeout in seconds.
-const PING_TIMEOUT: u64 = 20;
+const PING_TIMEOUT: u64 = 10;
 
 /// Monitor server.
 pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
@@ -87,6 +87,7 @@ pub async fn poll_server(
 
     // Try ping fallback if server is currently started
     if server.state() == State::Started {
+        debug!(target: "lazymc::monitor", "Failed to get status from started server, trying ping...");
         do_ping(config, addr).await?;
     }
 
