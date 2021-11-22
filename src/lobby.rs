@@ -20,10 +20,9 @@ use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
 use tokio::time;
-use uuid::Uuid;
 
 use crate::config::*;
-use crate::mc;
+use crate::mc::{self, uuid};
 use crate::net;
 use crate::proto;
 use crate::proto::client::{Client, ClientInfo, ClientState};
@@ -198,10 +197,7 @@ async fn respond_login_success(
 ) -> Result<(), ()> {
     packet::write_packet(
         LoginSuccess {
-            uuid: Uuid::new_v3(
-                &Uuid::new_v3(&Uuid::nil(), b"OfflinePlayer"),
-                login_start.name.as_bytes(),
-            ),
+            uuid: uuid::offline_player_uuid(&login_start.name),
             username: login_start.name.clone(),
         },
         client,
