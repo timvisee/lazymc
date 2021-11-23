@@ -29,7 +29,7 @@ pub async fn send(
     let subtitle = text.lines().skip(1).collect::<Vec<_>>().join("\n");
 
     match client_info.protocol() {
-        Some(p) if p <= v1_16_3::PROTOCOL => send_v1_16_3(client, writer, title, &subtitle).await,
+        Some(p) if p < v1_17::PROTOCOL => send_v1_16_3(client, writer, title, &subtitle).await,
         _ => send_v1_17(client, writer, title, &subtitle).await,
     }
 }

@@ -21,7 +21,7 @@ pub async fn send(
     let id = KEEP_ALIVE_ID.fetch_add(1, Ordering::Relaxed);
 
     match client_info.protocol() {
-        Some(p) if p <= v1_16_3::PROTOCOL => {
+        Some(p) if p < v1_17::PROTOCOL => {
             packet::write_packet(v1_16_3::game::ClientBoundKeepAlive { id }, client, writer).await
         }
         _ => packet::write_packet(v1_17::game::ClientBoundKeepAlive { id }, client, writer).await,

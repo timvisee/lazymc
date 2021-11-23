@@ -15,7 +15,7 @@ pub async fn send(
     writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     match client_info.protocol() {
-        Some(p) if p <= v1_16_3::PROTOCOL => {
+        Some(p) if p < v1_17::PROTOCOL => {
             packet::write_packet(
                 v1_16_3::game::TimeUpdate {
                     world_age: 0,

@@ -335,7 +335,7 @@ async fn wait_for_server_join_game_no_timeout(
             Ok(Some(packet)) => packet,
             Ok(None) => break,
             Err(_) => {
-                error!(target: "lazymc::lobby", "Closing connection, error occurred");
+                error!(target: "lazymc::probe", "Closing connection, error occurred");
                 break;
             }
         };
@@ -344,15 +344,15 @@ async fn wait_for_server_join_game_no_timeout(
         if packets::play::join_game::is_packet(client_info, packet.id) {
             // Parse join game data
             let join_game_data = JoinGameData::from_packet(client_info, packet).map_err(|err| {
-                warn!(target: "lazymc::lobby", "Failed to parse join game packet: {:?}", err);
+                warn!(target: "lazymc::probe", "Failed to parse join game packet: {:?}", err);
             })?;
 
             return Ok(join_game_data);
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc::lobby", "Got unhandled packet from server in wait_for_server_join_game:");
-        debug!(target: "lazymc::lobby", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
+        debug!(target: "lazymc::probe", "Got unhandled packet from server in wait_for_server_join_game:");
+        debug!(target: "lazymc::probe", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
 
     // Gracefully close connection

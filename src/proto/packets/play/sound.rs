@@ -12,7 +12,7 @@ pub async fn send(
     sound_name: &str,
 ) -> Result<(), ()> {
     match client_info.protocol() {
-        Some(p) if p <= v1_16_3::PROTOCOL => {
+        Some(p) if p < v1_17::PROTOCOL => {
             packet::write_packet(
                 v1_16_3::game::NamedSoundEffect {
                     sound_name: sound_name.into(),
