@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use futures::FutureExt;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::version::v1_14_4::login::{
-    LoginPluginRequest, LoginStart, LoginSuccess, SetCompression,
+    LoginPluginRequest, LoginPluginResponse, LoginStart, LoginSuccess, SetCompression,
 };
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
@@ -168,9 +168,6 @@ pub async fn serve(
 
             return Ok(());
         }
-
-        // TODO: when receiving Login Plugin Request, respond with empty payload
-        // See: https://wiki.vg/Protocol#Login_Plugin_Request
 
         // Show unhandled packet warning
         debug!(target: "lazymc", "Received unhandled packet:");
@@ -471,19 +468,36 @@ async fn connect_to_server_no_timeout(
         if client_state == ClientState::Login
             && packet.id == packets::login::CLIENT_LOGIN_PLUGIN_REQUEST
         {
-            // TODO: update message if not on forge
-            trace!(target: "lazymc::lobby", "Received login plugin request from server, assuming we should send Forge payload now");
-
             // Decode login plugin request
             let plugin_request =
                 LoginPluginRequest::decode(&mut packet.data.as_slice()).map_err(|err| {
                     dbg!(err);
                 })?;
 
-            // Respond to Forge login plugin request
-            forge::respond_login_plugin_request(&tmp_client, plugin_request, &mut writer).await?;
+            // Respond with Forge messages
+            if config.server.forge {
+                trace!(target: "lazymc::lobby", "Received login plugin request from server, responding with Forge reply");
 
-            // TODO: if not on forge, respond with empty payload because we don't understand
+                // Respond to Forge login plugin request
+                forge::respond_login_plugin_request(&tmp_client, plugin_request, &mut writer)
+                    .await?;
+
+                continue;
+            }
+
+            warn!(target: "lazymc::lobby", "Received unexpected login plugin request from server, you may need to enable Forge support");
+
+            // Write unsuccesful login plugin response
+            packet::write_packet(
+                LoginPluginResponse {
+                    message_id: plugin_request.message_id,
+                    successful: false,
+                    data: vec![],
+                },
+                &tmp_client,
+                &mut writer,
+            )
+            .await?;
 
             continue;
         }
