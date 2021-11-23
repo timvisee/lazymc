@@ -1,21 +1,32 @@
+#[cfg(feature = "lobby")]
 use std::sync::Arc;
+#[cfg(feature = "lobby")]
 use std::time::Duration;
 
+#[cfg(feature = "lobby")]
 use bytes::BytesMut;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::forge_v1_13::login::{Acknowledgement, LoginWrapper, ModList};
 use minecraft_protocol::version::v1_14_4::login::{LoginPluginRequest, LoginPluginResponse};
 use minecraft_protocol::version::PacketId;
+#[cfg(feature = "lobby")]
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::WriteHalf;
+#[cfg(feature = "lobby")]
 use tokio::net::TcpStream;
+#[cfg(feature = "lobby")]
 use tokio::time;
 
 use crate::forge;
-use crate::proto::client::{Client, ClientState};
+use crate::proto::client::Client;
+#[cfg(feature = "lobby")]
+use crate::proto::client::ClientState;
+use crate::proto::packet;
 use crate::proto::packet::RawPacket;
-use crate::proto::{packet, packets};
+#[cfg(feature = "lobby")]
+use crate::proto::packets;
+#[cfg(feature = "lobby")]
 use crate::server::Server;
 
 /// Forge status magic.
@@ -76,7 +87,7 @@ pub async fn respond_login_plugin_request(
 
     // Determine whether we received the mod list
     let is_unknown_header = login_wrapper.channel != forge::CHANNEL_HANDSHAKE;
-    let is_mod_list = !is_unknown_header && packet.id == packets::forge::login::CLIENT_MOD_LIST;
+    let is_mod_list = !is_unknown_header && packet.id == ModList::PACKET_ID;
 
     // If not the mod list, just acknowledge
     if !is_mod_list {
@@ -144,6 +155,7 @@ pub async fn decode_forge_login_packet(
 }
 
 /// Replay the Forge login payload for a client.
+#[cfg(feature = "lobby")]
 pub async fn replay_login_payload(
     client: &Client,
     inbound: &mut TcpStream,
@@ -169,6 +181,7 @@ pub async fn replay_login_payload(
 }
 
 /// Drain Forge login plugin response packets from stream.
+#[cfg(feature = "lobby")]
 async fn drain_forge_responses(
     client: &Client,
     inbound: &mut TcpStream,

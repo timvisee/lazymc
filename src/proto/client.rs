@@ -115,6 +115,9 @@ impl Default for ClientState {
 /// Client info, useful during connection handling.
 #[derive(Debug, Clone, Default)]
 pub struct ClientInfo {
+    /// Used protocol version.
+    pub protocol: Option<u32>,
+
     /// Handshake as received from client.
     pub handshake: Option<Handshake>,
 
@@ -125,5 +128,11 @@ pub struct ClientInfo {
 impl ClientInfo {
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Get protocol version.
+    pub fn protocol(&self) -> Option<u32> {
+        self.protocol
+            .or_else(|| self.handshake.as_ref().map(|h| h.protocol_version as u32))
     }
 }

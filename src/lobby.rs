@@ -1,27 +1,14 @@
 use std::io::ErrorKind;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::BytesMut;
 use futures::FutureExt;
-use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::decoder::Decoder;
-use minecraft_protocol::version::forge_v1_13::login::LoginWrapper;
 use minecraft_protocol::version::v1_14_4::login::{
-    LoginDisconnect, LoginPluginRequest, LoginPluginResponse, LoginStart, LoginSuccess,
-    SetCompression,
+    LoginPluginRequest, LoginStart, LoginSuccess, SetCompression,
 };
-use minecraft_protocol::version::v1_16_5::game::{Title, TitleAction};
-use minecraft_protocol::version::v1_17_1::game::{
-    ClientBoundKeepAlive, ClientBoundPluginMessage, JoinGame, NamedSoundEffect,
-    PlayerPositionAndLook, Respawn, SetTitleSubtitle, SetTitleText, SetTitleTimes, TimeUpdate,
-};
-use minecraft_protocol::version::PacketId;
-use nbt::CompoundTag;
-use proto::packet::RawPacket;
-use rand::Rng;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -30,19 +17,17 @@ use tokio::time;
 
 use crate::config::*;
 use crate::forge;
-use crate::mc::{self, dimension, uuid};
+use crate::mc::uuid;
 use crate::net;
 use crate::proto;
 use crate::proto::client::{Client, ClientInfo, ClientState};
+use crate::proto::packets::play::join_game::JoinGameData;
 use crate::proto::{packet, packets};
 use crate::proxy;
 use crate::server::{Server, State};
 
 /// Interval to send keep-alive packets at.
-const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
-
-/// Auto incrementing ID source for keep alive packets.
-static KEEP_ALIVE_ID: AtomicU64 = AtomicU64::new(0);
+pub const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Timeout for creating new server connection for lobby client.
 const SERVER_CONNECT_TIMEOUT: Duration = Duration::from_secs(2 * 60);
@@ -59,11 +44,6 @@ const SERVER_JOIN_GAME_TIMEOUT: Duration = Duration::from_secs(20);
 /// server needs time to transition the client into this state.
 /// See warning at: https://wiki.vg/Protocol#Login_Success
 const SERVER_WARMUP: Duration = Duration::from_secs(1);
-
-/// Server brand to send to client in lobby world.
-///
-/// Shown in F3 menu. Updated once client is relayed to real server.
-const SERVER_BRAND: &[u8] = b"lazymc";
 
 /// Serve lobby service for given client connection.
 ///
@@ -121,8 +101,7 @@ pub async fn serve(
             if config.server.forge {
                 forge::replay_login_payload(client, &mut inbound, server.clone(), &mut inbound_buf)
                     .await?;
-                let (returned_reader, returned_writer) = inbound.split();
-                reader = returned_reader;
+                let (_returned_reader, returned_writer) = inbound.split();
                 writer = returned_writer;
             }
 
@@ -140,25 +119,33 @@ pub async fn serve(
             trace!(target: "lazymc::lobby", "Client login success, sending required play packets for lobby world");
 
             // Send packets to client required to get into workable play state for lobby world
-            send_lobby_play_packets(client, &mut writer, &server).await?;
+            send_lobby_play_packets(client, &client_info, &mut writer, &server).await?;
 
-            // Wait for server to come online, then set up new connection to it
-            stage_wait(client, &server, &config, &mut writer).await?;
+            // Wait for server to come online
+            stage_wait(client, &client_info, &server, &config, &mut writer).await?;
+
+            // Start new connection to server
+            let server_client_info = client_info.clone();
             let (server_client, mut outbound, mut server_buf) =
-                connect_to_server(client_info, &inbound, &config).await?;
+                connect_to_server(&server_client_info, &inbound, &config).await?;
             let (returned_reader, returned_writer) = inbound.split();
             reader = returned_reader;
             writer = returned_writer;
 
             // Grab join game packet from server
-            let join_game =
-                wait_for_server_join_game(&server_client, &mut outbound, &mut server_buf).await?;
+            let join_game_data = wait_for_server_join_game(
+                &server_client,
+                &server_client_info,
+                &mut outbound,
+                &mut server_buf,
+            )
+            .await?;
 
             // Reset lobby title
-            send_lobby_title(client, &mut writer, "").await?;
+            packets::play::title::send(client, &client_info, &mut writer, "").await?;
 
             // Play ready sound if configured
-            play_lobby_ready_sound(client, &mut writer, &config).await?;
+            play_lobby_ready_sound(client, &client_info, &mut writer, &config).await?;
 
             // Wait a second because Notchian servers are slow
             // See: https://wiki.vg/Protocol#Login_Success
@@ -166,7 +153,8 @@ pub async fn serve(
             time::sleep(SERVER_WARMUP).await;
 
             // Send respawn packet, initiates teleport to real server world
-            send_respawn_from_join(client, &mut writer, join_game).await?;
+            packets::play::respawn::lobby_send(client, &client_info, &mut writer, join_game_data)
+                .await?;
 
             // Drain inbound connection so we don't confuse the server
             // TODO: can we void everything? we might need to forward everything to server except
@@ -226,6 +214,7 @@ async fn respond_login_success(
 /// Play lobby ready sound effect if configured.
 async fn play_lobby_ready_sound(
     client: &Client,
+    client_info: &ClientInfo,
     writer: &mut WriteHalf<'_>,
     config: &Config,
 ) -> Result<(), ()> {
@@ -237,8 +226,8 @@ async fn play_lobby_ready_sound(
         }
 
         // Play sound effect
-        send_lobby_player_pos(client, writer).await?;
-        send_lobby_sound_effect(client, writer, sound_name).await?;
+        packets::play::player_pos::send(client, client_info, writer).await?;
+        packets::play::sound::send(client, client_info, writer, sound_name).await?;
     }
 
     Ok(())
@@ -247,246 +236,25 @@ async fn play_lobby_ready_sound(
 /// Send packets to client to get workable play state for lobby world.
 async fn send_lobby_play_packets(
     client: &Client,
+    client_info: &ClientInfo,
     writer: &mut WriteHalf<'_>,
     server: &Server,
 ) -> Result<(), ()> {
     // See: https://wiki.vg/Protocol_FAQ#What.27s_the_normal_login_sequence_for_a_client.3F
 
     // Send initial game join
-    send_lobby_join_game(client, writer, server).await?;
+    packets::play::join_game::lobby_send(client, client_info, writer, server).await?;
 
     // Send server brand
-    send_lobby_brand(client, writer).await?;
+    packets::play::server_brand::send(client, client_info, writer).await?;
 
     // Send spawn and player position, disables 'download terrain' screen
-    send_lobby_player_pos(client, writer).await?;
+    packets::play::player_pos::send(client, client_info, writer).await?;
 
     // Notify client of world time, required once before keep-alive packets
-    send_lobby_time_update(client, writer).await?;
+    packets::play::time_update::send(client, client_info, writer).await?;
 
     Ok(())
-}
-
-/// Send initial join game packet to client for lobby.
-async fn send_lobby_join_game(
-    client: &Client,
-    writer: &mut WriteHalf<'_>,
-    server: &Server,
-) -> Result<(), ()> {
-    // Get dimension codec and build lobby dimension
-    let dimension_codec: CompoundTag =
-        if let Some(ref join_game) = server.probed_join_game.lock().await.as_ref() {
-            join_game.dimension_codec.clone()
-        } else {
-            dimension::lobby_default_dimension_codec()
-        };
-    let dimension: CompoundTag = dimension::lobby_dimension(&dimension_codec);
-
-    // Send Minecrafts default states, slightly customised for lobby world
-    packet::write_packet(
-        {
-            let status = server.status().await;
-            JoinGame {
-                // Player ID must be unique, if it collides with another server entity ID the player gets
-                // in a weird state and cannot move
-                entity_id: 0,
-                // TODO: use real server value
-                hardcore: false,
-                game_mode: 3,
-                previous_game_mode: -1i8 as u8,
-                world_names: vec![
-                    "minecraft:overworld".into(),
-                    "minecraft:the_nether".into(),
-                    "minecraft:the_end".into(),
-                ],
-                dimension_codec,
-                dimension,
-                world_name: "lazymc:lobby".into(),
-                hashed_seed: 0,
-                max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
-                // TODO: use real server value
-                view_distance: 10,
-                // TODO: use real server value
-                reduced_debug_info: false,
-                // TODO: use real server value
-                enable_respawn_screen: true,
-                is_debug: true,
-                is_flat: false,
-            }
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send lobby brand to client.
-async fn send_lobby_brand(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    packet::write_packet(
-        ClientBoundPluginMessage {
-            channel: "minecraft:brand".into(),
-            data: SERVER_BRAND.into(),
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send lobby player position to client.
-async fn send_lobby_player_pos(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    // Send player location, disables download terrain screen
-    packet::write_packet(
-        PlayerPositionAndLook {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            yaw: 0.0,
-            pitch: 90.0,
-            flags: 0b00000000,
-            teleport_id: 0,
-            dismount_vehicle: true,
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send lobby time update to client.
-async fn send_lobby_time_update(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    const MC_TIME_NOON: i64 = 6000;
-
-    // Send time update, required once for keep-alive packets
-    packet::write_packet(
-        TimeUpdate {
-            world_age: MC_TIME_NOON,
-            time_of_day: MC_TIME_NOON,
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send keep alive packet to client.
-///
-/// Required periodically in play mode to prevent client timeout.
-async fn send_keep_alive(client: &Client, writer: &mut WriteHalf<'_>) -> Result<(), ()> {
-    packet::write_packet(
-        ClientBoundKeepAlive {
-            // Keep sending new IDs
-            id: KEEP_ALIVE_ID.fetch_add(1, Ordering::Relaxed),
-        },
-        client,
-        writer,
-    )
-    .await
-
-    // TODO: verify we receive keep alive response with same ID from client
-}
-
-/// Send lobby title packets to client.
-///
-/// This will show the given text for two keep-alive periods. Use a newline for the subtitle.
-///
-/// If an empty string is given, the title times will be reset to default.
-async fn send_lobby_title(
-    client: &Client,
-    writer: &mut WriteHalf<'_>,
-    text: &str,
-) -> Result<(), ()> {
-    // Grab title and subtitle bits
-    let title = text.lines().next().unwrap_or("");
-    let subtitle = text.lines().skip(1).collect::<Vec<_>>().join("\n");
-
-    // Set title
-    packet::write_packet(
-        SetTitleText {
-            text: Message::new(Payload::text(title)),
-        },
-        client,
-        writer,
-    )
-    .await?;
-
-    // Set subtitle
-    packet::write_packet(
-        SetTitleSubtitle {
-            text: Message::new(Payload::text(&subtitle)),
-        },
-        client,
-        writer,
-    )
-    .await?;
-
-    // Set title times
-    packet::write_packet(
-        if title.is_empty() && subtitle.is_empty() {
-            // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
-            SetTitleTimes {
-                fade_in: 10,
-                stay: 70,
-                fade_out: 20,
-            }
-        } else {
-            SetTitleTimes {
-                fade_in: 0,
-                stay: KEEP_ALIVE_INTERVAL.as_secs() as i32 * mc::TICKS_PER_SECOND as i32 * 2,
-                fade_out: 0,
-            }
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send lobby ready sound effect to client.
-async fn send_lobby_sound_effect(
-    client: &Client,
-    writer: &mut WriteHalf<'_>,
-    sound_name: &str,
-) -> Result<(), ()> {
-    packet::write_packet(
-        NamedSoundEffect {
-            sound_name: sound_name.into(),
-            sound_category: 0,
-            effect_pos_x: 0,
-            effect_pos_y: 0,
-            effect_pos_z: 0,
-            volume: 1.0,
-            pitch: 1.0,
-        },
-        client,
-        writer,
-    )
-    .await
-}
-
-/// Send respawn packet to client to jump from lobby into now loaded server.
-///
-/// The required details will be fetched from the `join_game` packet as provided by the server.
-async fn send_respawn_from_join(
-    client: &Client,
-    writer: &mut WriteHalf<'_>,
-    join_game: JoinGame,
-) -> Result<(), ()> {
-    packet::write_packet(
-        Respawn {
-            dimension: join_game.dimension,
-            world_name: join_game.world_name,
-            hashed_seed: join_game.hashed_seed,
-            game_mode: join_game.game_mode,
-            previous_game_mode: join_game.previous_game_mode,
-            is_debug: join_game.is_debug,
-            is_flat: join_game.is_flat,
-            copy_metadata: false,
-        },
-        client,
-        writer,
-    )
-    .await
 }
 
 /// An infinite keep-alive loop.
@@ -494,6 +262,7 @@ async fn send_respawn_from_join(
 /// This will keep sending keep-alive and title packets to the client until it is dropped.
 async fn keep_alive_loop(
     client: &Client,
+    client_info: &ClientInfo,
     writer: &mut WriteHalf<'_>,
     config: &Config,
 ) -> Result<(), ()> {
@@ -505,8 +274,10 @@ async fn keep_alive_loop(
         trace!(target: "lazymc::lobby", "Sending keep-alive sequence to lobby client");
 
         // Send keep alive and title packets
-        send_keep_alive(client, writer).await?;
-        send_lobby_title(client, writer, &config.join.lobby.message).await?;
+        packets::play::keep_alive::send(client, client_info, writer).await?;
+        packets::play::title::send(client, client_info, writer, &config.join.lobby.message).await?;
+
+        // TODO: verify we receive correct keep alive response
     }
 }
 
@@ -517,12 +288,13 @@ async fn keep_alive_loop(
 /// During this stage we keep sending keep-alive and title packets to the client to keep it active.
 async fn stage_wait(
     client: &Client,
+    client_info: &ClientInfo,
     server: &Server,
     config: &Config,
     writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     select! {
-        a = keep_alive_loop(client, writer, config) => a,
+        a = keep_alive_loop(client, client_info, writer, config) => a,
         b = wait_for_server(server, config) => b,
     }
 }
@@ -586,7 +358,7 @@ async fn wait_for_server(server: &Server, config: &Config) -> Result<(), ()> {
 ///
 /// This will initialize the connection to the play state. Client details are used.
 async fn connect_to_server(
-    client_info: ClientInfo,
+    client_info: &ClientInfo,
     inbound: &TcpStream,
     config: &Config,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
@@ -605,7 +377,7 @@ async fn connect_to_server(
 /// This will initialize the connection to the play state. Client details are used.
 // TODO: clean this up
 async fn connect_to_server_no_timeout(
-    client_info: ClientInfo,
+    client_info: &ClientInfo,
     inbound: &TcpStream,
     config: &Config,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
@@ -639,12 +411,17 @@ async fn connect_to_server_no_timeout(
         ClientState::Login.to_id(),
         "Client handshake should have login as next state"
     );
-    packet::write_packet(client_info.handshake.unwrap(), &tmp_client, &mut writer).await?;
+    packet::write_packet(
+        client_info.handshake.clone().unwrap(),
+        &tmp_client,
+        &mut writer,
+    )
+    .await?;
 
     // Request login start
     packet::write_packet(
         LoginStart {
-            name: client_info.username.ok_or(())?,
+            name: client_info.username.clone().ok_or(())?,
         },
         &tmp_client,
         &mut writer,
@@ -768,12 +545,13 @@ async fn connect_to_server_no_timeout(
 /// This parses, consumes and returns the packet.
 async fn wait_for_server_join_game(
     client: &Client,
+    client_info: &ClientInfo,
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
-) -> Result<JoinGame, ()> {
+) -> Result<JoinGameData, ()> {
     time::timeout(
         SERVER_JOIN_GAME_TIMEOUT,
-        wait_for_server_join_game_no_timeout(client, outbound, buf),
+        wait_for_server_join_game_no_timeout(client, client_info, outbound, buf),
     )
     .await
     .map_err(|_| {
@@ -788,9 +566,10 @@ async fn wait_for_server_join_game(
 // TODO: do not drop error here, return Box<dyn Error>
 async fn wait_for_server_join_game_no_timeout(
     client: &Client,
+    client_info: &ClientInfo,
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
-) -> Result<JoinGame, ()> {
+) -> Result<JoinGameData, ()> {
     let (mut reader, mut _writer) = outbound.split();
 
     loop {
@@ -805,12 +584,13 @@ async fn wait_for_server_join_game_no_timeout(
         };
 
         // Catch join game
-        if packet.id == packets::play::CLIENT_JOIN_GAME {
-            let join_game = JoinGame::decode(&mut packet.data.as_slice()).map_err(|err| {
-                dbg!(err);
+        if packets::play::join_game::is_packet(client_info, packet.id) {
+            // Parse join game data
+            let join_game_data = JoinGameData::from_packet(client_info, packet).map_err(|err| {
+                warn!(target: "lazymc::lobby", "Failed to parse join game packet: {:?}", err);
             })?;
 
-            return Ok(join_game);
+            return Ok(join_game_data);
         }
 
         // Show unhandled packet warning

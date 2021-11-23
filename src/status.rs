@@ -84,6 +84,9 @@ pub async fn serve(
             };
 
             // Update client info and client state
+            client_info
+                .protocol
+                .replace(handshake.protocol_version as u32);
             client_info.handshake.replace(handshake);
             client.set_state(new_state);
 

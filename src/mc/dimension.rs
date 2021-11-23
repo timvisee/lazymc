@@ -76,7 +76,7 @@ fn lobby_base_dimension(dimension_types: &CompoundTag) -> CompoundTag {
 ///
 /// This likely breaks if the Minecraft version doesn't match exactly.
 /// Please use an up-to-date coded from the server instead.
-pub fn lobby_default_dimension_codec() -> CompoundTag {
+pub fn default_dimension_codec() -> CompoundTag {
     snbt_to_compound_tag(include_str!("../../res/dimension_codec.snbt"))
 }
 

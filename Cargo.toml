@@ -28,7 +28,7 @@ rcon = ["rust_rcon", "async-std"]
 
 # Lobby support
 # Add lobby join method, keeps client in fake lobby world until server is ready.
-lobby = ["md-5", "named-binary-tag", "quartz_nbt", "uuid"]
+lobby = ["md-5", "uuid"]
 
 [dependencies]
 anyhow = "1.0"
@@ -42,10 +42,12 @@ dotenv = "0.15"
 flate2 = { version = "1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3", default-features = false, features = ["executor"] }
 log = "0.4"
-minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "6d1ef0b" }
+minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "5b80bc2" }
+named-binary-tag = "0.6"
 notify = "4.0"
 pretty_env_logger = "0.4"
 proxy-protocol = "0.5"
+quartz_nbt = "0.2"
 rand = "0.8"
 serde = "1.0"
 serde_json = "1.0"
@@ -61,8 +63,6 @@ async-std = { version = "1.9.0", default-features = false, optional = true }
 
 # Feature: lobby
 md-5 = { version = "0.9", optional = true }
-named-binary-tag = { version = "0.6", optional = true }
-quartz_nbt = { version = "0.2", optional = true }
 uuid = { version = "0.7", optional = true, features = ["v3"] }
 
 [target.'cfg(unix)'.dependencies]

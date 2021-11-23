@@ -8,14 +8,14 @@ use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::{
     LoginPluginRequest, LoginPluginResponse, LoginStart, SetCompression,
 };
-use minecraft_protocol::version::v1_17_1::game::JoinGame;
 use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
 use crate::forge;
 use crate::net;
-use crate::proto::client::{Client, ClientState};
+use crate::proto::client::{Client, ClientInfo, ClientState};
+use crate::proto::packets::play::join_game::JoinGameData;
 use crate::proto::{self, packet, packets};
 use crate::server::{Server, State};
 
@@ -149,6 +149,10 @@ async fn connect_to_server_no_timeout(
     };
     tmp_client.set_state(ClientState::Login);
 
+    // Construct client info
+    let mut tmp_client_info = ClientInfo::empty();
+    tmp_client_info.protocol.replace(config.public.protocol);
+
     let (mut reader, mut writer) = outbound.split();
 
     // Select server address to use, add magic if Forge
@@ -270,8 +274,10 @@ async fn connect_to_server_no_timeout(
             tmp_client.set_state(ClientState::Play);
 
             // Wait to catch join game packet
-            let join_game = wait_for_server_join_game(&tmp_client, &mut outbound, &mut buf).await?;
-            server.probed_join_game.lock().await.replace(join_game);
+            let join_game_data =
+                wait_for_server_join_game(&tmp_client, &tmp_client_info, &mut outbound, &mut buf)
+                    .await?;
+            server.probed_join_game.lock().await.replace(join_game_data);
 
             // Gracefully close connection
             let _ = net::close_tcp_stream(outbound).await;
@@ -296,12 +302,13 @@ async fn connect_to_server_no_timeout(
 /// This parses, consumes and returns the packet.
 async fn wait_for_server_join_game(
     client: &Client,
+    client_info: &ClientInfo,
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
-) -> Result<JoinGame, ()> {
+) -> Result<JoinGameData, ()> {
     time::timeout(
         PROBE_JOIN_GAME_TIMEOUT,
-        wait_for_server_join_game_no_timeout(client, outbound, buf),
+        wait_for_server_join_game_no_timeout(client, client_info, outbound, buf),
     )
     .await
     .map_err(|_| {
@@ -316,9 +323,10 @@ async fn wait_for_server_join_game(
 // TODO: do not drop error here, return Box<dyn Error>
 async fn wait_for_server_join_game_no_timeout(
     client: &Client,
+    client_info: &ClientInfo,
     outbound: &mut TcpStream,
     buf: &mut BytesMut,
-) -> Result<JoinGame, ()> {
+) -> Result<JoinGameData, ()> {
     let (mut reader, mut _writer) = outbound.split();
 
     loop {
@@ -333,12 +341,13 @@ async fn wait_for_server_join_game_no_timeout(
         };
 
         // Catch join game
-        if packet.id == packets::play::CLIENT_JOIN_GAME {
-            let join_game = JoinGame::decode(&mut packet.data.as_slice()).map_err(|err| {
-                error!(target: "lazymc::probe", "Failed to decode join game packet, ignoring: {:?}", err);
+        if packets::play::join_game::is_packet(client_info, packet.id) {
+            // Parse join game data
+            let join_game_data = JoinGameData::from_packet(client_info, packet).map_err(|err| {
+                warn!(target: "lazymc::lobby", "Failed to parse join game packet: {:?}", err);
             })?;
 
-            return Ok(join_game);
+            return Ok(join_game_data);
         }
 
         // Show unhandled packet warning

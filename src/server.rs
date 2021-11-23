@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 use futures::FutureExt;
 use minecraft_protocol::data::server_status::ServerStatus;
-use minecraft_protocol::version::v1_17_1::game::JoinGame;
 use tokio::process::Command;
 use tokio::sync::watch;
 #[cfg(feature = "rcon")]
@@ -16,6 +15,7 @@ use tokio::time;
 use crate::config::{Config, Server as ConfigServer};
 use crate::mc::ban::{BannedIp, BannedIps};
 use crate::os;
+use crate::proto::packets::play::join_game::JoinGameData;
 
 /// Server cooldown after the process quit.
 /// Used to give it some more time to quit forgotten threads, such as for RCON.
@@ -84,7 +84,7 @@ pub struct Server {
     // TODO: dont use mutex, do not make public, dont use bytesmut
     pub forge_payload: Mutex<Vec<Vec<u8>>>,
     // TODO: dont use mutex, do not make public, dont use bytesmut
-    pub probed_join_game: Mutex<Option<JoinGame>>,
+    pub probed_join_game: Mutex<Option<JoinGameData>>,
 }
 
 impl Server {
