@@ -1,6 +1,6 @@
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::error::DecodeError;
-use minecraft_protocol::version::{v1_16_5, v1_17};
+use minecraft_protocol::version::{v1_16_3, v1_17};
 use nbt::CompoundTag;
 #[cfg(feature = "lobby")]
 use tokio::net::tcp::WriteHalf;
@@ -33,16 +33,16 @@ impl JoinGameData {
     /// Extract join game data from given packet.
     pub fn from_packet(client_info: &ClientInfo, packet: RawPacket) -> Result<Self, DecodeError> {
         match client_info.protocol() {
-            Some(p) if p <= v1_16_5::PROTOCOL => {
-                Ok(v1_16_5::game::JoinGame::decode(&mut packet.data.as_slice())?.into())
+            Some(p) if p <= v1_16_3::PROTOCOL => {
+                Ok(v1_16_3::game::JoinGame::decode(&mut packet.data.as_slice())?.into())
             }
             _ => Ok(v1_17::game::JoinGame::decode(&mut packet.data.as_slice())?.into()),
         }
     }
 }
 
-impl From<v1_16_5::game::JoinGame> for JoinGameData {
-    fn from(join_game: v1_16_5::game::JoinGame) -> Self {
+impl From<v1_16_3::game::JoinGame> for JoinGameData {
+    fn from(join_game: v1_16_3::game::JoinGame) -> Self {
         Self {
             dimension: Some(join_game.dimension),
             dimension_codec: Some(join_game.dimension_codec),
@@ -74,7 +74,7 @@ impl From<v1_17::game::JoinGame> for JoinGameData {
 /// Check whether the packet ID matches.
 pub fn is_packet(client_info: &ClientInfo, packet_id: u8) -> bool {
     match client_info.protocol() {
-        Some(p) if p <= v1_16_5::PROTOCOL => packet_id == v1_16_5::game::JoinGame::PACKET_ID,
+        Some(p) if p <= v1_16_3::PROTOCOL => packet_id == v1_16_3::game::JoinGame::PACKET_ID,
         _ => packet_id == v1_17::game::JoinGame::PACKET_ID,
     }
 }
@@ -102,9 +102,9 @@ pub async fn lobby_send(
     let status = server.status().await;
 
     match client_info.protocol() {
-        Some(p) if p <= v1_16_5::PROTOCOL => {
+        Some(p) if p <= v1_16_3::PROTOCOL => {
             packet::write_packet(
-                v1_16_5::game::JoinGame {
+                v1_16_3::game::JoinGame {
                     // Player ID must be unique, if it collides with another server entity ID the player gets
                     // in a weird state and cannot move
                     entity_id: 0,

@@ -1,5 +1,5 @@
 use minecraft_protocol::data::chat::{Message, Payload};
-use minecraft_protocol::version::{v1_16_5, v1_17};
+use minecraft_protocol::version::{v1_16_3, v1_17};
 use tokio::net::tcp::WriteHalf;
 
 #[cfg(feature = "lobby")]
@@ -29,18 +29,18 @@ pub async fn send(
     let subtitle = text.lines().skip(1).collect::<Vec<_>>().join("\n");
 
     match client_info.protocol() {
-        Some(p) if p <= v1_16_5::PROTOCOL => send_v1_16_5(client, writer, title, &subtitle).await,
+        Some(p) if p <= v1_16_3::PROTOCOL => send_v1_16_3(client, writer, title, &subtitle).await,
         _ => send_v1_17(client, writer, title, &subtitle).await,
     }
 }
 
-async fn send_v1_16_5(
+async fn send_v1_16_3(
     client: &Client,
     writer: &mut WriteHalf<'_>,
     title: &str,
     subtitle: &str,
 ) -> Result<(), ()> {
-    use v1_16_5::game::{Title, TitleAction};
+    use v1_16_3::game::{Title, TitleAction};
 
     // Set title
     packet::write_packet(

@@ -1,4 +1,4 @@
-use minecraft_protocol::version::{v1_16_5, v1_17};
+use minecraft_protocol::version::{v1_16_3, v1_17};
 use tokio::net::tcp::WriteHalf;
 
 use crate::proto::client::{Client, ClientInfo};
@@ -11,9 +11,9 @@ pub async fn send(
     writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     match client_info.protocol() {
-        Some(p) if p <= v1_16_5::PROTOCOL => {
+        Some(p) if p <= v1_16_3::PROTOCOL => {
             packet::write_packet(
-                v1_16_5::game::PlayerPositionAndLook {
+                v1_16_3::game::PlayerPositionAndLook {
                     x: 0.0,
                     y: 0.0,
                     z: 0.0,

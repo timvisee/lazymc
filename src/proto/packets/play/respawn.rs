@@ -1,4 +1,4 @@
-use minecraft_protocol::version::{v1_16_5, v1_17};
+use minecraft_protocol::version::{v1_16_3, v1_17};
 use tokio::net::tcp::WriteHalf;
 
 use super::join_game::JoinGameData;
@@ -16,9 +16,9 @@ pub async fn lobby_send(
     data: JoinGameData,
 ) -> Result<(), ()> {
     match client_info.protocol() {
-        Some(p) if p <= v1_16_5::PROTOCOL => {
+        Some(p) if p <= v1_16_3::PROTOCOL => {
             packet::write_packet(
-                v1_16_5::game::Respawn {
+                v1_16_3::game::Respawn {
                     dimension: data.dimension.unwrap_or_else(|| {
                         dimension::lobby_dimension(
                             &data
