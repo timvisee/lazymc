@@ -189,7 +189,7 @@ pub async fn serve(
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc", "Received unhandled packet:");
+        debug!(target: "lazymc", "Got unhandled packet:");
         debug!(target: "lazymc", "- State: {:?}", client_state);
         debug!(target: "lazymc", "- Packet ID: {}", packet.id);
     }

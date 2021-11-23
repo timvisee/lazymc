@@ -249,7 +249,7 @@ async fn connect_to_server_no_timeout(
                 continue;
             }
 
-            warn!(target: "lazymc::probe", "Received unexpected login plugin request, responding with error");
+            warn!(target: "lazymc::probe", "Got unexpected login plugin request, responding with error");
 
             // Respond with plugin response failure
             packet::write_packet(
@@ -268,7 +268,7 @@ async fn connect_to_server_no_timeout(
 
         // Hijack login success
         if client_state == ClientState::Login && packet.id == packets::login::CLIENT_LOGIN_SUCCESS {
-            trace!(target: "lazymc::probe", "Received login success from server connection, change to play mode");
+            trace!(target: "lazymc::probe", "Got login success from server connection, change to play mode");
 
             // Switch to play state
             tmp_client.set_state(ClientState::Play);
@@ -286,7 +286,7 @@ async fn connect_to_server_no_timeout(
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc::forge", "Received unhandled packet from server in connect_to_server:");
+        debug!(target: "lazymc::forge", "Got unhandled packet from server in connect_to_server:");
         debug!(target: "lazymc::forge", "- State: {:?}", client_state);
         debug!(target: "lazymc::forge", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
@@ -351,7 +351,7 @@ async fn wait_for_server_join_game_no_timeout(
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc::lobby", "Received unhandled packet from server in wait_for_server_join_game:");
+        debug!(target: "lazymc::lobby", "Got unhandled packet from server in wait_for_server_join_game:");
         debug!(target: "lazymc::lobby", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
 

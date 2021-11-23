@@ -170,7 +170,7 @@ pub async fn serve(
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc", "Received unhandled packet:");
+        debug!(target: "lazymc", "Got unhandled packet:");
         debug!(target: "lazymc", "- State: {:?}", client_state);
         debug!(target: "lazymc", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
@@ -464,6 +464,18 @@ async fn connect_to_server_no_timeout(
             continue;
         }
 
+        // Catch encryption requests
+        if client_state == ClientState::Login
+            && packet.id == packets::login::CLIENT_ENCRYPTION_REQUEST
+        {
+            error!(
+                target: "lazymc::lobby",
+                "Got encryption request from server, this is unsupported. Server must be in offline mode to use lobby.",
+            );
+
+            break;
+        }
+
         // Hijack login plugin request
         if client_state == ClientState::Login
             && packet.id == packets::login::CLIENT_LOGIN_PLUGIN_REQUEST
@@ -476,7 +488,7 @@ async fn connect_to_server_no_timeout(
 
             // Respond with Forge messages
             if config.server.forge {
-                trace!(target: "lazymc::lobby", "Received login plugin request from server, responding with Forge reply");
+                trace!(target: "lazymc::lobby", "Got login plugin request from server, responding with Forge reply");
 
                 // Respond to Forge login plugin request
                 forge::respond_login_plugin_request(&tmp_client, plugin_request, &mut writer)
@@ -485,7 +497,7 @@ async fn connect_to_server_no_timeout(
                 continue;
             }
 
-            warn!(target: "lazymc::lobby", "Received unexpected login plugin request from server, you may need to enable Forge support");
+            warn!(target: "lazymc::lobby", "Got unexpected login plugin request from server, you may need to enable Forge support");
 
             // Write unsuccesful login plugin response
             packet::write_packet(
@@ -504,7 +516,7 @@ async fn connect_to_server_no_timeout(
 
         // Hijack login success
         if client_state == ClientState::Login && packet.id == packets::login::CLIENT_LOGIN_SUCCESS {
-            trace!(target: "lazymc::lobby", "Received login success from server connection, change to play mode");
+            trace!(target: "lazymc::lobby", "Got login success from server connection, change to play mode");
 
             // TODO: parse this packet to ensure it's fine
             // let login_success =
@@ -526,7 +538,7 @@ async fn connect_to_server_no_timeout(
 
         // Hijack disconnect
         if client_state == ClientState::Login && packet.id == packets::login::CLIENT_DISCONNECT {
-            error!(target: "lazymc::lobby", "Received disconnect from server connection");
+            error!(target: "lazymc::lobby", "Got disconnect from server connection");
 
             // // Decode disconnect packet
             // let login_disconnect =
@@ -539,11 +551,8 @@ async fn connect_to_server_no_timeout(
             break;
         }
 
-        // TODO: if receiving encryption request, disconnect with error because we don't support
-        // online mode!
-
         // Show unhandled packet warning
-        debug!(target: "lazymc::lobby", "Received unhandled packet from server in connect_to_server:");
+        debug!(target: "lazymc::lobby", "Got unhandled packet from server in connect_to_server:");
         debug!(target: "lazymc::lobby", "- State: {:?}", client_state);
         debug!(target: "lazymc::lobby", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
@@ -608,7 +617,7 @@ async fn wait_for_server_join_game_no_timeout(
         }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc::lobby", "Received unhandled packet from server in wait_for_server_join_game:");
+        debug!(target: "lazymc::lobby", "Got unhandled packet from server in wait_for_server_join_game:");
         debug!(target: "lazymc::lobby", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }
 

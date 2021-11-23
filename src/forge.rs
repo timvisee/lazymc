@@ -234,7 +234,7 @@ async fn drain_forge_responses(
         // TODO: instantly return on this packet?
         // // Hijack login success
         // if client_state == ClientState::Login && packet.id == packets::login::CLIENT_LOGIN_SUCCESS {
-        //     trace!(target: "lazymc::forge", "Received login success from server connection, change to play mode");
+        //     trace!(target: "lazymc::forge", "Got login success from server connection, change to play mode");
 
         //     // Switch to play state
         //     tmp_client.set_state(ClientState::Play);
@@ -243,7 +243,7 @@ async fn drain_forge_responses(
         // }
 
         // Show unhandled packet warning
-        debug!(target: "lazymc::forge", "Received unhandled packet from server in record_forge_response:");
+        debug!(target: "lazymc::forge", "Got unhandled packet from server in record_forge_response:");
         debug!(target: "lazymc::forge", "- State: {:?}", client_state);
         debug!(target: "lazymc::forge", "- Packet ID: 0x{:02X} ({})", packet.id, packet.id);
     }

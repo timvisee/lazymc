@@ -24,6 +24,8 @@ pub mod login {
     pub const CLIENT_DISCONNECT: u8 = LoginDisconnect::PACKET_ID;
     pub const CLIENT_LOGIN_SUCCESS: u8 = LoginSuccess::PACKET_ID;
     pub const CLIENT_SET_COMPRESSION: u8 = SetCompression::PACKET_ID;
+    #[cfg(feature = "lobby")]
+    pub const CLIENT_ENCRYPTION_REQUEST: u8 = EncryptionRequest::PACKET_ID;
     pub const CLIENT_LOGIN_PLUGIN_REQUEST: u8 = LoginPluginRequest::PACKET_ID;
     pub const SERVER_LOGIN_START: u8 = LoginStart::PACKET_ID;
     #[cfg(feature = "lobby")]
