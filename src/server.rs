@@ -27,6 +27,10 @@ const SERVER_QUIT_COOLDOWN: Duration = Duration::from_millis(2500);
 #[cfg(feature = "rcon")]
 const RCON_COOLDOWN: Duration = Duration::from_secs(15);
 
+/// Exit code when SIGTERM is received on Unix.
+#[cfg(unix)]
+const UNIX_EXIT_SIGTERM: i32 = 130;
+
 /// Shared server state.
 #[derive(Debug)]
 pub struct Server {
@@ -441,6 +445,11 @@ pub async fn invoke_server_cmd(
     let crashed = match child.wait().await {
         Ok(status) if status.success() => {
             debug!(target: "lazymc", "Server process stopped successfully ({})", status);
+            false
+        }
+        #[cfg(unix)]
+        Ok(status) if status.code() == Some(UNIX_EXIT_SIGTERM) => {
+            debug!(target: "lazymc", "Server process stopped successfully by SIGTERM ({})", status);
             false
         }
         Ok(status) => {
