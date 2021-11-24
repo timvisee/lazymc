@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 (2021-11-24)
+
+- Fix status response issues with missing server icon, fall back to default icon
+- Fix incorrect UUID for players in lobby logic
+- Make server directory relative to configuration file path
+- Assume SIGTERM exit code for server process to be successful on Unix
+- Update features in README
+- Update dependencies
+
 ## 0.2.3 (2021-11-22)
 
 - Add support for `PROXY` header to notify Minecraft server of real client IP
