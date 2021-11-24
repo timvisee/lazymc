@@ -238,7 +238,7 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
             favicon = status.as_ref().unwrap().favicon.clone()
         }
         if favicon.is_none() {
-            favicon = Some(server_favicon(&config).await);
+            favicon = Some(server_favicon(config).await);
         }
     }
 

@@ -208,13 +208,9 @@ impl Server {
     ///
     /// This does not check whether it exists.
     pub fn server_directory(config: &Config) -> Option<PathBuf> {
-        if config.server.directory.is_none() {
-            return None;
-        }
-
         // Get directory, relative to config directory if known
         match config.path.as_ref().and_then(|p| p.parent()) {
-            Some(config_dir) => Some(config_dir.join(config.server.directory.as_ref().unwrap())),
+            Some(config_dir) => Some(config_dir.join(config.server.directory.as_ref()?)),
             None => config.server.directory.clone(),
         }
     }

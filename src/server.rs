@@ -508,7 +508,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
     }
 
     // Create RCON client
-    let mut rcon = match Rcon::connect_config(&config).await {
+    let mut rcon = match Rcon::connect_config(config).await {
         Ok(rcon) => rcon,
         Err(err) => {
             error!(target: "lazymc", "Failed to RCON server to sleep: {}", err);
