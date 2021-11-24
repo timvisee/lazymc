@@ -99,7 +99,7 @@ pub async fn serve(
 
         // Hijack server status packet
         if client_state == ClientState::Status && packet.id == packets::status::SERVER_STATUS {
-            let server_status = server_status(&config, &server).await;
+            let server_status = server_status(&client_info, &config, &server).await;
             let packet = StatusResponse { server_status };
 
             let mut data = Vec::new();
@@ -197,7 +197,7 @@ pub async fn serve(
 }
 
 /// Build server status object to respond to client with.
-async fn server_status(config: &Config, server: &Server) -> ServerStatus {
+async fn server_status(client_info: &ClientInfo, config: &Config, server: &Server) -> ServerStatus {
     let status = server.status().await;
     let server_state = server.state();
 
@@ -233,11 +233,13 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
 
     // Extract favicon from real server status, load from disk, or use default
     let mut favicon = None;
-    if config.motd.from_server && status.is_some() {
-        favicon = status.as_ref().unwrap().favicon.clone()
-    }
-    if favicon.is_none() {
-        favicon = Some(server_favicon(&config).await);
+    if favicon::supports_favicon(client_info) {
+        if config.motd.from_server && status.is_some() {
+            favicon = status.as_ref().unwrap().favicon.clone()
+        }
+        if favicon.is_none() {
+            favicon = Some(server_favicon(&config).await);
+        }
     }
 
     // Build status resposne
