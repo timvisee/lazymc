@@ -39,6 +39,6 @@ be ready to go! Connect with your Minecraft client to wake your server up!
 
 _Note: if you put `lazymc` in `PATH`, or if you
 [install](../README.md#compile-from-source) it through Cargo, you can invoke
-`lazymc` everywhere directly without the `.\` prefix.
+`lazymc` everywhere directly without the `.\` prefix._
 
 [latest-release]: https://github.com/timvisee/lazymc/releases/latest
