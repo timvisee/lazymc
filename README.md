@@ -35,7 +35,7 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 ## Features
 
 - Very efficient, lightweight & low-profile (~3KB RAM)
-- Supports Minecraft Java Edition 1.6+, supports modded (e.g. Forge, FTB)
+- Supports Minecraft Java Edition 1.7.2+, supports modded (e.g. Forge, FTB)
 - Configure joining client occupation methods:
   - Hold: hold clients when server starts, relay when ready, without them noticing
   - Kick: kick clients when server starts, with a starting message
