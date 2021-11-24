@@ -100,6 +100,7 @@ pub enum ProxyHeader {
     None,
 
     /// Header for locally initiated connection.
+    #[allow(unused)]
     Local,
 
     /// Header for proxied connection.
