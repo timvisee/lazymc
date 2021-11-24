@@ -14,6 +14,7 @@ use tokio::net::TcpStream;
 
 use crate::config::*;
 use crate::join;
+use crate::mc::favicon;
 use crate::proto::action;
 use crate::proto::client::{Client, ClientInfo, ClientState};
 use crate::proto::packet::{self, RawPacket};
@@ -230,12 +231,14 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
         }
     };
 
-    // Get server favicon
-    let favicon = if config.motd.from_server && status.is_some() {
-        status.as_ref().unwrap().favicon.clone()
-    } else {
-        favicon(&config).await
-    };
+    // Extract favicon from real server status, load from disk, or use default
+    let mut favicon = None;
+    if config.motd.from_server && status.is_some() {
+        favicon = status.as_ref().unwrap().favicon.clone()
+    }
+    if favicon.is_none() {
+        favicon = Some(server_favicon(&config).await);
+    }
 
     // Build status resposne
     ServerStatus {
@@ -251,31 +254,31 @@ async fn server_status(config: &Config, server: &Server) -> ServerStatus {
 }
 
 /// Get server status favicon.
-async fn favicon(config: &Config) -> Option<String> {
+///
+/// This always returns a favicon, returning the default one if none is set.
+async fn server_favicon(config: &Config) -> String {
     // Get server dir
     let dir = match config.server.directory.as_ref() {
         Some(dir) => dir,
-        None => return None,
+        None => return favicon::default_favicon(),
     };
 
     // Server icon file, ensure it exists
     let path = dir.join(SERVER_ICON_FILE);
     if !path.is_file() {
-        return None;
+        return favicon::default_favicon();
     }
 
     // Read icon data
-    let data = fs::read(path)
-        .await
-        .map_err(|err| {
-            error!(target: "lazymc", "Failed to read favicon from {}: {}", SERVER_ICON_FILE, err);
-        })
-        .ok()?;
+    let data = match fs::read(path).await.map_err(|err| {
+        error!(target: "lazymc", "Failed to read favicon from {}: {}", SERVER_ICON_FILE, err);
+    }) {
+        Ok(data) => data,
+        Err(err) => {
+            error!(target: "lazymc::status", "Failed to load server icon from disk, using default: {:?}", err);
+            return favicon::default_favicon();
+        }
+    };
 
-    // Format and return favicon
-    Some(format!(
-        "{}{}",
-        "data:image/png;base64,",
-        base64::encode(data)
-    ))
+    favicon::encode_favicon(&data)
 }
