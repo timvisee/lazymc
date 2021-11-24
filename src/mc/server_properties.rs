@@ -11,39 +11,39 @@ const EOL: &str = "\r\n";
 /// Try to rewrite changes in server.properties file in dir.
 ///
 /// Prints an error and stops on failure.
-pub fn rewrite_dir(dir: &Path, changes: HashMap<&str, String>) {
+pub fn rewrite_dir<P: AsRef<Path>>(dir: P, changes: HashMap<&str, String>) {
     if changes.is_empty() {
         return;
     }
 
     // Ensure directory exists
-    if !dir.is_dir() {
+    if !dir.as_ref().is_dir() {
         warn!(target: "lazymc",
             "Not rewriting {} file, configured server directory doesn't exist: {}",
             FILE,
-            dir.to_str().unwrap_or("?")
+            dir.as_ref().to_str().unwrap_or("?")
         );
         return;
     }
 
     // Rewrite file
-    rewrite_file(&dir.join(FILE), changes)
+    rewrite_file(dir.as_ref().join(FILE), changes)
 }
 
 /// Try to rewrite changes in server.properties file.
 ///
 /// Prints an error and stops on failure.
-pub fn rewrite_file(file: &Path, changes: HashMap<&str, String>) {
+pub fn rewrite_file<P: AsRef<Path>>(file: P, changes: HashMap<&str, String>) {
     if changes.is_empty() {
         return;
     }
 
     // File must exist
-    if !file.is_file() {
+    if !file.as_ref().is_file() {
         warn!(target: "lazymc",
             "Not writing {} file, not found at: {}",
             FILE,
-            file.to_str().unwrap_or("?"),
+            file.as_ref().to_str().unwrap_or("?"),
         );
         return;
     }

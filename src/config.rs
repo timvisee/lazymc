@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::ArgMatches;
 use serde::Deserialize;
@@ -63,6 +63,12 @@ pub fn load(matches: &ArgMatches) -> Config {
 /// Configuration.
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    /// Configuration path if known.
+    ///
+    /// Should be used as base directory for filesystem operations.
+    #[serde(skip)]
+    pub path: Option<PathBuf>,
+
     /// Public configuration.
     #[serde(default)]
     pub public: Public,
@@ -101,9 +107,9 @@ pub struct Config {
 
 impl Config {
     /// Load configuration from file.
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, io::Error> {
-        let data = fs::read(path)?;
-        let config: Config = toml::from_slice(&data)?;
+    pub fn load(path: PathBuf) -> Result<Self, io::Error> {
+        let data = fs::read(&path)?;
+        let mut config: Config = toml::from_slice(&data)?;
 
         // Show warning if config version is problematic
         match &config.config.version {
@@ -118,6 +124,7 @@ impl Config {
                 Ok(true) => {}
             },
         }
+        config.path.replace(path);
 
         Ok(config)
     }
@@ -152,8 +159,10 @@ impl Default for Public {
 #[derive(Debug, Deserialize)]
 pub struct Server {
     /// Server directory.
+    ///
+    /// Private because you should use `Server::server_directory()` instead.
     #[serde(default = "option_pathbuf_dot")]
-    pub directory: Option<PathBuf>,
+    directory: Option<PathBuf>,
 
     /// Start command.
     pub command: String,
@@ -192,6 +201,23 @@ pub struct Server {
     /// Add HAProxy v2 header to proxied connections.
     #[serde(default)]
     pub send_proxy_v2: bool,
+}
+
+impl Server {
+    /// Get the server directory.
+    ///
+    /// This does not check whether it exists.
+    pub fn server_directory(config: &Config) -> Option<PathBuf> {
+        if config.server.directory.is_none() {
+            return None;
+        }
+
+        // Get directory, relative to config directory if known
+        match config.path.as_ref().and_then(|p| p.parent()) {
+            Some(config_dir) => Some(config_dir.join(config.server.directory.as_ref().unwrap())),
+            None => config.server.directory.clone(),
+        }
+    }
 }
 
 /// Time configuration.

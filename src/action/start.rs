@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use clap::ArgMatches;
 
-use crate::config::{self, Config};
+use crate::config::{self, Config, Server as ConfigServer};
 use crate::mc::server_properties;
 use crate::proto;
 use crate::service;
@@ -120,7 +120,7 @@ fn rewrite_server_properties(config: &Config) {
     }
 
     // Ensure server directory is set, it must exist
-    let dir = match &config.server.directory {
+    let dir = match ConfigServer::server_directory(config) {
         Some(dir) => dir,
         None => {
             warn!(target: "lazymc", "Not rewriting {} file, server directory not configured (server.directory)", server_properties::FILE);

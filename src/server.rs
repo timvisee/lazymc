@@ -12,7 +12,7 @@ use tokio::sync::Semaphore;
 use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 use tokio::time;
 
-use crate::config::Config;
+use crate::config::{Config, Server as ConfigServer};
 use crate::mc::ban::{BannedIp, BannedIps};
 use crate::os;
 
@@ -421,7 +421,7 @@ pub async fn invoke_server_cmd(
     cmd.kill_on_drop(true);
 
     // Set working directory
-    if let Some(ref dir) = config.server.directory {
+    if let Some(ref dir) = ConfigServer::server_directory(&config) {
         cmd.current_dir(dir);
     }
 

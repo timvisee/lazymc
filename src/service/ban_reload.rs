@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 
-use crate::config::Config;
+use crate::config::{Config, Server as ConfigServer};
 use crate::mc::ban;
 use crate::server::Server;
 
@@ -23,7 +23,7 @@ pub fn service(config: Arc<Config>, server: Arc<Server>) {
     }
 
     // Ensure server directory is set, it must exist
-    let dir = match &config.server.directory {
+    let dir = match ConfigServer::server_directory(&config) {
         Some(dir) => dir,
         None => {
             warn!(target: "lazymc", "Not blocking banned IPs, server directory not configured, unable to find {} file", ban::FILE);

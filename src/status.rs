@@ -12,7 +12,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
-use crate::config::*;
+use crate::config::{Config, Server as ConfigServer};
 use crate::join;
 use crate::mc::favicon;
 use crate::proto::action;
@@ -260,7 +260,7 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
 /// This always returns a favicon, returning the default one if none is set.
 async fn server_favicon(config: &Config) -> String {
     // Get server dir
-    let dir = match config.server.directory.as_ref() {
+    let dir = match ConfigServer::server_directory(config) {
         Some(dir) => dir,
         None => return favicon::default_favicon(),
     };
