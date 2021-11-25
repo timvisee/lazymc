@@ -25,8 +25,8 @@ pub fn lobby_dimension(codec: &CompoundTag) -> CompoundTag {
     base.insert_i64("fixed_time", 0);
     base.insert_i8("has_raids", 0);
     base.insert_i32("min_y", 0);
-    base.insert_i32("height", 1);
-    base.insert_i32("logical_height", 1);
+    base.insert_i32("height", 16);
+    base.insert_i32("logical_height", 16);
     base.insert_f64("coordinate_scale", 1.0);
     base.insert_i8("ultrawarm", 0);
     base.insert_i8("has_ceiling", 0);

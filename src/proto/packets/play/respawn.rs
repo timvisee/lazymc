@@ -26,7 +26,9 @@ pub async fn lobby_send(
                                 .unwrap_or_else(dimension::default_dimension_codec),
                         )
                     }),
-                    world_name: data.world_name.unwrap_or_else(|| "world".into()),
+                    world_name: data
+                        .world_name
+                        .unwrap_or_else(|| "minecraft:overworld".into()),
                     hashed_seed: data.hashed_seed.unwrap_or(0),
                     game_mode: data.game_mode.unwrap_or(0),
                     previous_game_mode: data.previous_game_mode.unwrap_or(-1i8 as u8),
@@ -49,7 +51,9 @@ pub async fn lobby_send(
                                 .unwrap_or_else(dimension::default_dimension_codec),
                         )
                     }),
-                    world_name: data.world_name.unwrap_or_else(|| "world".into()),
+                    world_name: data
+                        .world_name
+                        .unwrap_or_else(|| "minecraft:overworld".into()),
                     hashed_seed: data.hashed_seed.unwrap_or(0),
                     game_mode: data.game_mode.unwrap_or(0),
                     previous_game_mode: data.previous_game_mode.unwrap_or(-1i8 as u8),
