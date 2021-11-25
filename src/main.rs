@@ -31,6 +31,10 @@ use std::env;
 
 use clap::App;
 
+// Compile time feature compatability check.
+#[cfg(all(windows, not(feature = "rcon")))]
+compile_error!("Must enable \"rcon\" feature on Windows.");
+
 /// Default log level if none is set.
 const LOG_DEFAULT: &str = "info";
 
