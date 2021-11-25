@@ -21,9 +21,11 @@ enable this in a production environment.
 
 Current limitations:
 
-- Only works with offline mode
-- Only works with vanilla Minecraft clients, does not work with modded (e.g. Forge, FTB)
-- Probably only works with Minecraft 1.16.3-1.17.1 (tested with 1.17.1)
+- Server must be in offline mode (`online-mode=false`)
+- Server must use Minecraft version 1.16.3 to 1.17.1 (tested with 1.17.1)
+- Server must use vanilla Minecraft
+  - May work with Forge (set `server.forge = true`), depends on used mods, test before use
+  - Does not work with other mods, such as FTB
 - This method will consume the client, following configured join methods won't be used.
 
 At this time it is unknown if some of the above limitations will ever be lifted,
@@ -85,3 +87,25 @@ ready_sound = "block.note_block.chime"
 
 _Note: this might have changed, see the latest configuration
 [here](../res/lazymc.toml)._
+
+## Probe issue with whitelist
+
+lazymc may report a _probe_ error on first start when a whitelist is enabled
+on your server.
+
+lazymc uses a probe to fetch some required details from your Minecraft
+server, such as a mod list. When probing, the server is started once when lazymc
+starts. It then connects to the Minecraft server with the _probe_ user
+(username: `_lazymc_probe`) and disconnects when everything needed is fetched.
+
+If you use a whitelist on your server it will cause issues if the probe user
+isn't whitelisted. Simply whitelist the probe user with the following command
+and restart lazymc to fix the issue:
+
+```
+/whitelist add _lazymc_probe
+```
+
+Probing isn't enabled by default. You may enable this by setting
+`server.probe_on_start = true`. Other configuration settings might
+automatically enable proving if required for your setup.
