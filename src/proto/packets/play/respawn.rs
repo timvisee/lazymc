@@ -23,7 +23,7 @@ pub async fn lobby_send(
                         dimension::lobby_dimension(
                             &data
                                 .dimension_codec
-                                .unwrap_or_else(|| dimension::default_dimension_codec()),
+                                .unwrap_or_else(dimension::default_dimension_codec),
                         )
                     }),
                     world_name: data.world_name.unwrap_or_else(|| "world".into()),
@@ -46,7 +46,7 @@ pub async fn lobby_send(
                         dimension::lobby_dimension(
                             &data
                                 .dimension_codec
-                                .unwrap_or_else(|| dimension::default_dimension_codec()),
+                                .unwrap_or_else(dimension::default_dimension_codec),
                         )
                     }),
                     world_name: data.world_name.unwrap_or_else(|| "world".into()),

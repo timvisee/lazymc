@@ -58,7 +58,7 @@ async fn send_v1_16_3(
     packet::write_packet(
         Title {
             action: TitleAction::SetSubtitle {
-                text: Message::new(Payload::text(&subtitle)),
+                text: Message::new(Payload::text(subtitle)),
             },
         },
         client,
@@ -111,7 +111,7 @@ async fn send_v1_17(
     // Set subtitle
     packet::write_packet(
         SetTitleSubtitle {
-            text: Message::new(Payload::text(&subtitle)),
+            text: Message::new(Payload::text(subtitle)),
         },
         client,
         writer,

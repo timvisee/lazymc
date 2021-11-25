@@ -102,7 +102,7 @@ fn snbt_to_compound_tag(data: &str) -> CompoundTag {
         .expect("failed to encode NBT CompoundTag as binary");
 
     // Parse binary with usable NBT create
-    bin_to_compound_tag(&mut &*binary)
+    bin_to_compound_tag(&binary)
 }
 
 /// Read NBT CompoundTag from SNBT.

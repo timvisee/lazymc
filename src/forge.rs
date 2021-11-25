@@ -83,7 +83,7 @@ pub async fn respond_login_plugin_request(
 ) -> Result<(), ()> {
     // Decode Forge login wrapper packet
     let (message_id, login_wrapper, packet) =
-        forge::decode_forge_login_packet(&client, packet).await?;
+        forge::decode_forge_login_packet(client, packet).await?;
 
     // Determine whether we received the mod list
     let is_unknown_header = login_wrapper.channel != forge::CHANNEL_HANDSHAKE;
@@ -166,7 +166,7 @@ pub async fn replay_login_payload(
 
     // Replay each Forge packet
     for packet in server.forge_payload.lock().await.as_slice() {
-        inbound.write_all(&packet).await.map_err(|err| {
+        inbound.write_all(packet).await.map_err(|err| {
             error!(target: "lazymc::lobby", "Failed to send Forge join payload to lobby client, will likely cause issues: {}", err);
         })?;
     }
@@ -198,7 +198,7 @@ async fn drain_forge_responses(
         }
 
         // TODO: move timeout into constant
-        let read_packet_task = packet::read_packet(&client, buf, &mut reader);
+        let read_packet_task = packet::read_packet(client, buf, &mut reader);
         let timeout = time::timeout(Duration::from_secs(5), read_packet_task).await;
 
         let read_packet_task = match timeout {

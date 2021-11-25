@@ -53,7 +53,7 @@ pub async fn probe(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
 
     // Connect to server, record Forge payload
     let forge_payload = connect_to_server(&config, &server).await?;
-    *server.forge_payload.lock().await = forge_payload.into();
+    *server.forge_payload.lock().await = forge_payload;
 
     Ok(())
 }

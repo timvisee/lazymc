@@ -89,11 +89,11 @@ pub async fn lobby_send(
 ) -> Result<(), ()> {
     // Get dimension codec and build lobby dimension
     let dimension_codec: CompoundTag =
-        if let Some(ref join_game) = server.probed_join_game.lock().await.as_ref() {
+        if let Some(join_game) = server.probed_join_game.lock().await.as_ref() {
             join_game
                 .dimension_codec
                 .clone()
-                .unwrap_or_else(|| dimension::default_dimension_codec())
+                .unwrap_or_else(dimension::default_dimension_codec)
         } else {
             dimension::default_dimension_codec()
         };
