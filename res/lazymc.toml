@@ -30,7 +30,7 @@
 directory = "."
 
 # Command to start the server.
-# Warning: if using a bash script read: https://git.io/J1FvZ
+# Warning: if using a bash script read: https://git.io/JMIKH
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
 # Immediately wake server when starting lazymc.
