@@ -37,7 +37,7 @@ pub async fn occupy(
 
 /// Check whether we still have to probe before we can use the lobby.
 async fn must_still_probe(config: &Config, server: &Server) -> bool {
-    must_probe(config) && server.probed_join_game.lock().await.is_none()
+    must_probe(config) && server.probed_join_game.read().await.is_none()
 }
 
 /// Check whether we must have probed data.

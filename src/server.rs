@@ -81,10 +81,13 @@ pub struct Server {
     #[cfg(feature = "rcon")]
     rcon_last_stop: Mutex<Option<Instant>>,
 
-    // TODO: dont use mutex, do not make public, dont use bytesmut
-    pub forge_payload: Mutex<Vec<Vec<u8>>>,
-    // TODO: dont use mutex, do not make public, dont use bytesmut
-    pub probed_join_game: Mutex<Option<JoinGameData>>,
+    /// Probed join game data.
+    pub probed_join_game: RwLock<Option<JoinGameData>>,
+
+    /// Forge payload.
+    ///
+    /// Sent to clients when they connect to lobby. Recorded from server by probe.
+    pub forge_payload: RwLock<Vec<Vec<u8>>>,
 }
 
 impl Server {
@@ -372,8 +375,8 @@ impl Default for Server {
             rcon_lock: Semaphore::new(1),
             #[cfg(feature = "rcon")]
             rcon_last_stop: Default::default(),
-            forge_payload: Default::default(),
             probed_join_game: Default::default(),
+            forge_payload: Default::default(),
         }
     }
 }

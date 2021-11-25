@@ -25,8 +25,3 @@
 - hold back packets (whitelist), forward to server at connect before joining
 - add support for forge (emulate mod list communication)
 - on login plugin request during login state, respond with empty payload, not supported
-
-# Extra
-
-- simply don't occupy in lobby if we don't have probed data
-- dont use mutex for server data

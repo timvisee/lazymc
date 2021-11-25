@@ -38,6 +38,10 @@ pub const CHANNEL_LOGIN_WRAPPER: &str = "fml:loginwrapper";
 /// Forge handshake channel.
 pub const CHANNEL_HANDSHAKE: &str = "fml:handshake";
 
+/// Timeout for draining Forge plugin responses from client.
+#[cfg(feature = "lobby")]
+const CLIENT_DRAIN_FORGE_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Respond with Forge login wrapper packet.
 pub async fn respond_forge_login_packet(
     client: &Client,
@@ -165,14 +169,14 @@ pub async fn replay_login_payload(
     debug!(target: "lazymc::lobby", "Replaying Forge login procedure for lobby client...");
 
     // Replay each Forge packet
-    for packet in server.forge_payload.lock().await.as_slice() {
+    for packet in server.forge_payload.read().await.as_slice() {
         inbound.write_all(packet).await.map_err(|err| {
             error!(target: "lazymc::lobby", "Failed to send Forge join payload to lobby client, will likely cause issues: {}", err);
         })?;
     }
 
     // Drain all responses
-    let count = server.forge_payload.lock().await.len();
+    let count = server.forge_payload.read().await.len();
     drain_forge_responses(client, inbound, inbound_buf, count).await?;
 
     trace!(target: "lazymc::lobby", "Forge join payload replayed");
@@ -197,10 +201,9 @@ async fn drain_forge_responses(
             return Ok(());
         }
 
-        // TODO: move timeout into constant
+        // Read packet from stream with timeout
         let read_packet_task = packet::read_packet(client, buf, &mut reader);
-        let timeout = time::timeout(Duration::from_secs(5), read_packet_task).await;
-
+        let timeout = time::timeout(CLIENT_DRAIN_FORGE_TIMEOUT, read_packet_task).await;
         let read_packet_task = match timeout {
             Ok(result) => result,
             Err(_) => {

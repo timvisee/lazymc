@@ -106,18 +106,17 @@ pub async fn lobby_send(
     server: &Server,
 ) -> Result<(), ()> {
     let status = server.status().await;
-    let join_game = server.probed_join_game.lock().await;
+    let join_game = server.probed_join_game.read().await;
 
     // Get dimension codec and build lobby dimension
-    let dimension_codec: CompoundTag =
-        if let Some(join_game) = server.probed_join_game.lock().await.as_ref() {
-            join_game
-                .dimension_codec
-                .clone()
-                .unwrap_or_else(dimension::default_dimension_codec)
-        } else {
-            dimension::default_dimension_codec()
-        };
+    let dimension_codec: CompoundTag = if let Some(join_game) = join_game.as_ref() {
+        join_game
+            .dimension_codec
+            .clone()
+            .unwrap_or_else(dimension::default_dimension_codec)
+    } else {
+        dimension::default_dimension_codec()
+    };
 
     // Get other values from status and probed join game data
     let dimension: CompoundTag = dimension::lobby_dimension(&dimension_codec);

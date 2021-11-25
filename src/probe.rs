@@ -53,7 +53,7 @@ pub async fn probe(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
 
     // Connect to server, record Forge payload
     let forge_payload = connect_to_server(&config, &server).await?;
-    *server.forge_payload.lock().await = forge_payload;
+    *server.forge_payload.write().await = forge_payload;
 
     Ok(())
 }
@@ -277,7 +277,11 @@ async fn connect_to_server_no_timeout(
             let join_game_data =
                 wait_for_server_join_game(&tmp_client, &tmp_client_info, &mut outbound, &mut buf)
                     .await?;
-            server.probed_join_game.lock().await.replace(join_game_data);
+            server
+                .probed_join_game
+                .write()
+                .await
+                .replace(join_game_data);
 
             // Gracefully close connection
             let _ = net::close_tcp_stream(outbound).await;
