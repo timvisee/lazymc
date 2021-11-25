@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.5 (2021-11-25)
+
+- Add support Minecraft 1.16.3 to 1.17.1 with lobby join method
+- Add support for Forge client/server to lobby join method (partial)
+- Probe server on start with fake user to fetch server settings improving compatibility
+- Improve lobby compatibility, send probed server data to client when possible
+- Skip lobby join method if server probe is not yet finished
+- Generate lobby dimension configuration on the fly based on server dimensions
+- Fix unsupported lobby dimension configuration values for some Minecraft versions
+- Demote IP ban list reload message from info to debug
+- Update dependencies
+
 ## 0.2.4 (2021-11-24)
 
 - Fix status response issues with missing server icon, fall back to default icon
