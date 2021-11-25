@@ -69,7 +69,7 @@ check-windows:
   script:
     - cargo check --locked --verbose
     - cargo check --locked --no-default-features --features rcon --verbose
-    - cargo check --locked --no-default-features --features lobby --verbose
+    - cargo check --locked --no-default-features --features rcon,lobby --verbose
 
 # Build using Rust stable on Linux
 build-x86_64-linux-gnu:
@@ -247,7 +247,7 @@ test-cargo-x86_64-windows:
   script:
     - cargo test --locked --verbose
     - cargo test --locked --no-default-features --features rcon --verbose
-    - cargo test --locked --no-default-features --features lobby --verbose
+    - cargo test --locked --no-default-features --features rcon,lobby --verbose
 
 # Release binaries on GitLab as generic package
 release-gitlab-generic-package:
