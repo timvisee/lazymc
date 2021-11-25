@@ -19,12 +19,18 @@ use crate::server::Server;
 /// Data extracted from `JoinGame` packet.
 #[derive(Debug, Clone)]
 pub struct JoinGameData {
+    pub hardcore: Option<bool>,
+    pub game_mode: Option<u8>,
+    pub previous_game_mode: Option<u8>,
+    pub world_names: Option<Vec<String>>,
     pub dimension: Option<CompoundTag>,
     pub dimension_codec: Option<CompoundTag>,
     pub world_name: Option<String>,
     pub hashed_seed: Option<i64>,
-    pub game_mode: Option<u8>,
-    pub previous_game_mode: Option<u8>,
+    pub max_players: Option<i32>,
+    pub view_distance: Option<i32>,
+    pub reduced_debug_info: Option<bool>,
+    pub enable_respawn_screen: Option<bool>,
     pub is_debug: Option<bool>,
     pub is_flat: Option<bool>,
 }
@@ -44,12 +50,18 @@ impl JoinGameData {
 impl From<v1_16_3::game::JoinGame> for JoinGameData {
     fn from(join_game: v1_16_3::game::JoinGame) -> Self {
         Self {
+            hardcore: Some(join_game.hardcore),
+            game_mode: Some(join_game.game_mode),
+            previous_game_mode: Some(join_game.previous_game_mode),
+            world_names: Some(join_game.world_names.clone()),
             dimension: Some(join_game.dimension),
             dimension_codec: Some(join_game.dimension_codec),
             world_name: Some(join_game.world_name),
             hashed_seed: Some(join_game.hashed_seed),
-            game_mode: Some(join_game.game_mode),
-            previous_game_mode: Some(join_game.previous_game_mode),
+            max_players: Some(join_game.max_players),
+            view_distance: Some(join_game.view_distance),
+            reduced_debug_info: Some(join_game.reduced_debug_info),
+            enable_respawn_screen: Some(join_game.enable_respawn_screen),
             is_debug: Some(join_game.is_debug),
             is_flat: Some(join_game.is_flat),
         }
@@ -59,12 +71,18 @@ impl From<v1_16_3::game::JoinGame> for JoinGameData {
 impl From<v1_17::game::JoinGame> for JoinGameData {
     fn from(join_game: v1_17::game::JoinGame) -> Self {
         Self {
+            hardcore: Some(join_game.hardcore),
+            game_mode: Some(join_game.game_mode),
+            previous_game_mode: Some(join_game.previous_game_mode),
+            world_names: Some(join_game.world_names.clone()),
             dimension: Some(join_game.dimension),
             dimension_codec: Some(join_game.dimension_codec),
             world_name: Some(join_game.world_name),
             hashed_seed: Some(join_game.hashed_seed),
-            game_mode: Some(join_game.game_mode),
-            previous_game_mode: Some(join_game.previous_game_mode),
+            max_players: Some(join_game.max_players),
+            view_distance: Some(join_game.view_distance),
+            reduced_debug_info: Some(join_game.reduced_debug_info),
+            enable_respawn_screen: Some(join_game.enable_respawn_screen),
             is_debug: Some(join_game.is_debug),
             is_flat: Some(join_game.is_flat),
         }
@@ -87,6 +105,9 @@ pub async fn lobby_send(
     writer: &mut WriteHalf<'_>,
     server: &Server,
 ) -> Result<(), ()> {
+    let status = server.status().await;
+    let join_game = server.probed_join_game.lock().await;
+
     // Get dimension codec and build lobby dimension
     let dimension_codec: CompoundTag =
         if let Some(join_game) = server.probed_join_game.lock().await.as_ref() {
@@ -97,9 +118,39 @@ pub async fn lobby_send(
         } else {
             dimension::default_dimension_codec()
         };
-    let dimension: CompoundTag = dimension::lobby_dimension(&dimension_codec);
 
-    let status = server.status().await;
+    // Get other values from status and probed join game data
+    let dimension: CompoundTag = dimension::lobby_dimension(&dimension_codec);
+    let hardcore = join_game.as_ref().and_then(|p| p.hardcore).unwrap_or(false);
+    let world_names = join_game
+        .as_ref()
+        .and_then(|p| p.world_names.clone())
+        .unwrap_or_else(|| {
+            vec![
+                "minecraft:overworld".into(),
+                "minecraft:the_nether".into(),
+                "minecraft:the_end".into(),
+            ]
+        });
+    let max_players = status
+        .as_ref()
+        .map(|s| s.players.max as i32)
+        .or_else(|| join_game.as_ref().and_then(|p| p.max_players))
+        .unwrap_or(20);
+    let view_distance = join_game
+        .as_ref()
+        .and_then(|p| p.view_distance)
+        .unwrap_or(10);
+    let reduced_debug_info = join_game
+        .as_ref()
+        .and_then(|p| p.reduced_debug_info)
+        .unwrap_or(false);
+    let enable_respawn_screen = join_game
+        .as_ref()
+        .and_then(|p| p.enable_respawn_screen)
+        .unwrap_or(true);
+    let is_debug = join_game.as_ref().and_then(|p| p.is_debug).unwrap_or(false);
+    let is_flat = join_game.as_ref().and_then(|p| p.is_flat).unwrap_or(false);
 
     match client_info.protocol() {
         Some(p) if p < v1_17::PROTOCOL => {
@@ -108,28 +159,20 @@ pub async fn lobby_send(
                     // Player ID must be unique, if it collides with another server entity ID the player gets
                     // in a weird state and cannot move
                     entity_id: 0,
-                    // TODO: use real server value
-                    hardcore: false,
+                    hardcore,
                     game_mode: 3,
                     previous_game_mode: -1i8 as u8,
-                    world_names: vec![
-                        "minecraft:overworld".into(),
-                        "minecraft:the_nether".into(),
-                        "minecraft:the_end".into(),
-                    ],
+                    world_names,
                     dimension_codec,
                     dimension,
                     world_name: "lazymc:lobby".into(),
                     hashed_seed: 0,
-                    max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
-                    // TODO: use real server value
-                    view_distance: 10,
-                    // TODO: use real server value
-                    reduced_debug_info: false,
-                    // TODO: use real server value
-                    enable_respawn_screen: true,
-                    is_debug: true,
-                    is_flat: false,
+                    max_players,
+                    view_distance,
+                    reduced_debug_info,
+                    enable_respawn_screen,
+                    is_debug,
+                    is_flat,
                 },
                 client,
                 writer,
@@ -142,28 +185,20 @@ pub async fn lobby_send(
                     // Player ID must be unique, if it collides with another server entity ID the player gets
                     // in a weird state and cannot move
                     entity_id: 0,
-                    // TODO: use real server value
-                    hardcore: false,
+                    hardcore,
                     game_mode: 3,
                     previous_game_mode: -1i8 as u8,
-                    world_names: vec![
-                        "minecraft:overworld".into(),
-                        "minecraft:the_nether".into(),
-                        "minecraft:the_end".into(),
-                    ],
+                    world_names,
                     dimension_codec,
                     dimension,
                     world_name: "lazymc:lobby".into(),
                     hashed_seed: 0,
-                    max_players: status.as_ref().map(|s| s.players.max as i32).unwrap_or(20),
-                    // TODO: use real server value
-                    view_distance: 10,
-                    // TODO: use real server value
-                    reduced_debug_info: false,
-                    // TODO: use real server value
-                    enable_respawn_screen: true,
-                    is_debug: true,
-                    is_flat: false,
+                    max_players,
+                    view_distance,
+                    reduced_debug_info,
+                    enable_respawn_screen,
+                    is_debug,
+                    is_flat,
                 },
                 client,
                 writer,
