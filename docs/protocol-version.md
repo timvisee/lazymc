@@ -10,7 +10,7 @@ gets a new protocol version.
 
 ## Configuration
 
-In `lazymc` you may configure what protocol version to use:
+In lazymc you may configure what protocol version to use:
 
 [`lazymc.toml`](../res/lazymc.toml):
 
@@ -35,5 +35,5 @@ allow the best compatibility with clients.
 - Set `public.version` to any string you like. Shows up in read in clients that
   have an incompatibel protocol version number
 
-These are used as hint. `lazymc` will automatically use the protocol version of
+These are used as hint. lazymc will automatically use the protocol version of
 your Minecraft server once it has started at least once.

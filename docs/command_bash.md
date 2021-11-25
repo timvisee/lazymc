@@ -4,7 +4,7 @@ You may use a `bash` script to start your server rather than invoking `java`
 directly. This requires some changes though to ensure your server properly shuts
 down.
 
-When `lazymc` stops your server it sends a [`SIGTERM`][sigterm] signal to the
+When lazymc stops your server it sends a [`SIGTERM`][sigterm] signal to the
 invoked server process to gracefully shut it down. `bash` ignores this signal by
 default and keeps the Minecraft server running.
 

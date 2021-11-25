@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# See: https://git.io/JMIKH
+
 # Server JAR file, set this to your own
 FILE=server.jar
 

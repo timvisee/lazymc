@@ -3,7 +3,7 @@
 Some extra steps and recommendations when using lazymc:
 
 Before you use this in production, always ensure starting and stopping the
-server works as expected by connecting to it once. Watch `lazymc`s output while
+server works as expected by connecting to it once. Watch lazymc's output while
 it starts and stops. If stopping results in errors, fix this first to prevent
 corrupting world/user data.
 

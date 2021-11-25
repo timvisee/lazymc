@@ -43,7 +43,7 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
   - _Lobby: keep client in emulated server with lobby world, teleport to real server when ready ([experimental*](./docs/join-method-lobby.md))_
 - Customizable MOTD and login messages
 - Automatically manages `server.properties` (host, port and RCON settings)
-- Automatically block banned IPs from server within `lazymc`
+- Automatically block banned IPs from server within lazymc
 - Graceful server sleep/shutdown through RCON or `SIGTERM`
 - Real client IP on Minecraft server with `PROXY` header ([usage](./docs/proxy-ip.md))
 - Restart server on crash
@@ -77,8 +77,8 @@ chmod a+x ./lazymc
 ./lazymc --help
 ```
 
-When `lazymc` is set-up, change into your server directory if you haven't
-already. Then set up the [configuration](./res/lazymc.toml) and start it up:
+When lazymc is set-up, change into your server directory if you haven't already.
+Then set up the [configuration](./res/lazymc.toml) and start it up:
 
 ```bash
 # Change into your server directory (if you haven't already)
@@ -140,7 +140,7 @@ cargo build --release
 
 ## Third-party usage & implementations
 
-A list of third-party implementations, projects using `lazymc`, that you might
+A list of third-party implementations, projects using lazymc, that you might
 find useful:
 
 - Docker: [crbanman/papermc-lazymc](https://hub.docker.com/r/crbanman/papermc-lazymc) _(PaperMC with lazymc in Docker)_

@@ -7,7 +7,7 @@ The lobby join method allows you to keep clients in a lobby world while the
 server is starting. When the server is ready, the player is _teleported_ to the
 real server.
 
-`lazymc` emulates a fake server with an empty lobby world. The player is put in
+lazymc emulates a fake server with an empty lobby world. The player is put in
 this world, floating in space. A custom message is shown on the client to notify
 we're waiting on the server to start.
 
