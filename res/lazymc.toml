@@ -50,6 +50,9 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 #start_timeout = 300
 #stop_timeout = 150
 
+# To wake server, user must be in server whitelist if enabled on server.
+#wake_whitelist = true
+
 # Block banned IPs as listed in banned-ips.json in server directory.
 #block_banned_ips = true
 

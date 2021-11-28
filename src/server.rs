@@ -14,6 +14,7 @@ use tokio::time;
 
 use crate::config::{Config, Server as ConfigServer};
 use crate::mc::ban::{BannedIp, BannedIps};
+use crate::mc::whitelist::Whitelist;
 use crate::os;
 use crate::proto::packets::play::join_game::JoinGameData;
 
@@ -72,6 +73,9 @@ pub struct Server {
 
     /// List of banned IPs.
     banned_ips: RwLock<BannedIps>,
+
+    /// Whitelist if enabled.
+    whitelist: RwLock<Option<Whitelist>>,
 
     /// Lock for exclusive RCON operations.
     #[cfg(feature = "rcon")]
@@ -346,6 +350,18 @@ impl Server {
         futures::executor::block_on(async { self.is_banned_ip(ip).await })
     }
 
+    /// Check whether the given username is whitelisted.
+    ///
+    /// Returns `true` if no whitelist is currently used.
+    pub async fn is_whitelisted(&self, username: &str) -> bool {
+        self.whitelist
+            .read()
+            .await
+            .as_ref()
+            .map(|w| w.is_whitelisted(username))
+            .unwrap_or(true)
+    }
+
     /// Update the list of banned IPs.
     pub async fn set_banned_ips(&self, ips: BannedIps) {
         *self.banned_ips.write().await = ips;
@@ -354,6 +370,16 @@ impl Server {
     /// Update the list of banned IPs.
     pub fn set_banned_ips_blocking(&self, ips: BannedIps) {
         futures::executor::block_on(async { self.set_banned_ips(ips).await })
+    }
+
+    /// Update the whitelist.
+    pub async fn set_whitelist(&self, whitelist: Option<Whitelist>) {
+        *self.whitelist.write().await = whitelist;
+    }
+
+    /// Update the whitelist.
+    pub fn set_whitelist_blocking(&self, whitelist: Option<Whitelist>) {
+        futures::executor::block_on(async { self.set_whitelist(whitelist).await })
     }
 }
 
@@ -371,6 +397,7 @@ impl Default for Server {
             keep_online_until: Default::default(),
             kill_at: Default::default(),
             banned_ips: Default::default(),
+            whitelist: Default::default(),
             #[cfg(feature = "rcon")]
             rcon_lock: Semaphore::new(1),
             #[cfg(feature = "rcon")]

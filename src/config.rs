@@ -198,6 +198,10 @@ pub struct Server {
     #[serde(default = "u32_150")]
     pub stop_timeout: u32,
 
+    /// To wake server, user must be in server whitelist if enabled on server.
+    #[serde(default = "bool_true")]
+    pub wake_whitelist: bool,
+
     /// Block banned IPs as listed in banned-ips.json in server directory.
     #[serde(default = "bool_true")]
     pub block_banned_ips: bool,

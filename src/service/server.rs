@@ -59,7 +59,7 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     tokio::spawn(service::probe::service(config.clone(), server.clone()));
     tokio::task::spawn_blocking({
         let (config, server) = (config.clone(), server.clone());
-        || service::ban_reload::service(config, server)
+        || service::file_watcher::service(config, server)
     });
 
     // Route all incomming connections

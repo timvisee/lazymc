@@ -27,6 +27,9 @@ const BAN_MESSAGE_PREFIX: &str = "Your IP address is banned from this server.\nR
 /// Default ban reason if unknown.
 const DEFAULT_BAN_REASON: &str = "Banned by an operator.";
 
+/// The not-whitelisted kick message.
+const WHITELIST_MESSAGE: &str = "You are not white-listed on this server!";
+
 /// Server icon file path.
 const SERVER_ICON_FILE: &str = "server-icon.png";
 
@@ -155,6 +158,15 @@ pub async fn serve(
                         &mut writer,
                     )
                     .await?;
+                    break;
+                }
+            }
+
+            // Kick if client is not whitelisted to wake server
+            if let Some(ref username) = username {
+                if !server.is_whitelisted(username).await {
+                    info!(target: "lazymc", "User '{}' tried to wake server but is not whitelisted, disconnecting", username);
+                    action::kick(&client, WHITELIST_MESSAGE, &mut writer).await?;
                     break;
                 }
             }

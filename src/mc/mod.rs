@@ -7,6 +7,7 @@ pub mod rcon;
 pub mod server_properties;
 #[cfg(feature = "lobby")]
 pub mod uuid;
+pub mod whitelist;
 
 /// Minecraft ticks per second.
 #[allow(unused)]
