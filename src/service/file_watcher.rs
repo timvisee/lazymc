@@ -7,7 +7,7 @@ use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 
 use crate::config::{Config, Server as ConfigServer};
 use crate::mc::ban::{self, BannedIps};
-use crate::mc::whitelist;
+use crate::mc::{server_properties, whitelist};
 use crate::server::Server;
 
 /// File watcher debounce time.
@@ -103,11 +103,12 @@ fn update(config: &Config, server: &Server, dir: &Path, path: &Path) {
     }
 
     // Update whitelist
-    if path.ends_with(whitelist::WHITELIST_FILE) || path.ends_with(whitelist::OPS_FILE) {
+    if path.ends_with(whitelist::WHITELIST_FILE)
+        || path.ends_with(whitelist::OPS_FILE)
+        || path.ends_with(server_properties::FILE)
+    {
         reload_whitelist(config, server, dir);
     }
-
-    // TODO: update on server.properties change
 }
 
 /// Reload banned IPs.
@@ -149,7 +150,16 @@ fn reload_whitelist(config: &Config, server: &Server, dir: &Path) {
         return;
     }
 
-    // TODO: whitelist must be enabled in server.properties
+    // Must be enabled in server.properties
+    let enabled =
+        server_properties::read_property(&dir.join(server_properties::FILE), "white-list")
+            .map(|v| v.trim() == "true")
+            .unwrap_or(false);
+    if !enabled {
+        server.set_whitelist_blocking(None);
+        debug!(target: "lazymc", "Not using whitelist, not enabled in {}", server_properties::FILE);
+        return;
+    }
 
     trace!(target: "lazymc", "Reloading whitelisted users...");
 

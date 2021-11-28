@@ -145,3 +145,37 @@ fn rewrite_contents(contents: String, mut changes: HashMap<&str, String>) -> Opt
         None
     }
 }
+
+/// Read the given property from the given server.properties file.o
+///
+/// Returns `None` if file does not contain the property.
+pub fn read_property<P: AsRef<Path>>(file: P, property: &str) -> Option<String> {
+    // File must exist
+    if !file.as_ref().is_file() {
+        warn!(target: "lazymc",
+            "Failed to read property from {} file, it does not exist",
+            FILE,
+        );
+        return None;
+    }
+
+    // Read contents
+    let contents = match fs::read_to_string(&file) {
+        Ok(contents) => contents,
+        Err(err) => {
+            error!(target: "lazymc",
+                "Failed to read property from {} file, could not load: {}",
+                FILE,
+                err,
+            );
+            return None;
+        }
+    };
+
+    // Find property, return value
+    contents
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .find(|(p, _)| p.trim().to_lowercase() == property.to_lowercase())
+        .map(|(_, v)| v.trim().to_string())
+}
