@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.6 (2021-11-28)
+
+- Add whitelist support, use server whitelist to prevent unknown users from waking server
+- Update dependencies
+
 ## 0.2.5 (2021-11-25)
 
 - Add support Minecraft 1.16.3 to 1.17.1 with lobby join method
