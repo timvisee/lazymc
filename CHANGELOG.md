@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.7 (2021-12-13)
+
+- Update default Minecraft version to 1.18.1
+- Update dependencies
+
 ## 0.2.6 (2021-11-28)
 
 - Add whitelist support, use server whitelist to prevent unknown users from waking server
