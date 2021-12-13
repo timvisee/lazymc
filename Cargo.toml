@@ -35,7 +35,7 @@ anyhow = "1.0"
 base64 = "0.13"
 bytes = "1.1"
 chrono = "0.4"
-clap = { version = "3.0.0-beta.5", default-features = false, features = [ "std", "cargo", "color", "env", "suggestions", "unicode" ]}
+clap = { version = "=3.0.0-rc.4", default-features = false, features = [ "std", "cargo", "color", "env", "suggestions", "unicode" ]}
 colored = "2.0"
 derive_builder = "0.10"
 dotenv = "0.15"
@@ -62,7 +62,7 @@ rust_rcon = { package = "rcon", version = "0.5.2", optional = true }
 async-std = { version = "1.9.0", default-features = false, optional = true }
 
 # Feature: lobby
-md-5 = { version = "0.9", optional = true }
+md-5 = { version = "0.10", optional = true }
 uuid = { version = "0.7", optional = true, features = ["v3"] }
 
 [target.'cfg(unix)'.dependencies]

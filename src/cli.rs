@@ -27,7 +27,7 @@ pub fn app() -> App<'static> {
                 .global(true)
                 .value_name("FILE")
                 .default_value(crate::config::CONFIG_FILE)
-                .about("Use config file")
+                .help("Use config file")
                 .takes_value(true),
         )
 }
