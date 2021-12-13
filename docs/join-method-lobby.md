@@ -62,15 +62,18 @@ Then configure the lobby to your likings:
 # The client will be teleported to the real server once it is ready.
 # This may keep the client occupied forever if no timeout is set.
 # Consumes client, not allowing other join methods afterwards.
+# See: https://git.io/JMIi4
 
 # !!! WARNING !!!
-# This is highly experimental and unstable.
+# This is highly experimental, incomplete and unstable.
 # This may break the game and crash clients.
 # Don't enable this unless you know what you're doing.
 #
-# - Only works with offline mode
-# - Only works with vanilla Minecraft clients, does not work with modded
-# - Only tested with Minecraft 1.17.1
+# - Server must be in offline mode
+# - Server must use Minecraft version 1.16.3 to 1.17.1 (tested with 1.17.1)
+# - Server must use vanilla Minecraft
+#   - May work with Forge, enable in config, depends on used mods, test before use
+#   - Does not work with other mods, such as FTB
 
 # Maximum time in seconds in the lobby while the server starts.
 timeout = 600

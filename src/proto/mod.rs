@@ -9,7 +9,7 @@ pub mod packets;
 /// in the configuration.
 ///
 /// Should be kept up-to-date with latest supported Minecraft version by lazymc.
-pub const PROTO_DEFAULT_VERSION: &str = "1.17.1";
+pub const PROTO_DEFAULT_VERSION: &str = "1.18.1";
 
 /// Default minecraft protocol version.
 ///
@@ -17,7 +17,7 @@ pub const PROTO_DEFAULT_VERSION: &str = "1.17.1";
 /// in the configuration.
 ///
 /// Should be kept up-to-date with latest supported Minecraft version by lazymc.
-pub const PROTO_DEFAULT_PROTOCOL: u32 = 756;
+pub const PROTO_DEFAULT_PROTOCOL: u32 = 757;
 
 /// Compression threshold to use.
 // TODO: read this from server.properties instead
