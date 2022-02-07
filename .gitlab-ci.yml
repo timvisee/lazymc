@@ -36,6 +36,9 @@ before_script:
     - rustc --version
     - cargo --version
 
+    # Install proper Rust target
+    - rustup target install x86_64-pc-windows-msvc
+
 # Check on stable, beta and nightly 
 .check-base: &check-base
   stage: check
