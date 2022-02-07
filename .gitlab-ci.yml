@@ -32,7 +32,7 @@ before_script:
     - Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
 
     # Install Rust
-    - scoop install rustup
+    - scoop install rustup gcc
     - rustc --version
     - cargo --version
 
