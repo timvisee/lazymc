@@ -31,7 +31,7 @@ lobby = ["md-5", "uuid"]
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.13"
+base64 = "0.20"
 bytes = "1.1"
 chrono = "0.4"
 clap = { version = "3.0", default-features = false, features = [
@@ -43,7 +43,7 @@ clap = { version = "3.0", default-features = false, features = [
     "unicode",
 ] }
 colored = "2.0"
-derive_builder = "0.10"
+derive_builder = "0.12"
 dotenv = "0.15"
 flate2 = { version = "1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3", default-features = false, features = ["executor"] }
