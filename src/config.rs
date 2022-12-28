@@ -478,17 +478,11 @@ impl Default for Advanced {
 }
 
 /// Config configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 pub struct ConfigConfig {
     /// Configuration for lazymc version.
     pub version: Option<String>,
-}
-
-impl Default for ConfigConfig {
-    fn default() -> Self {
-        Self { version: None }
-    }
 }
 
 fn option_pathbuf_dot() -> Option<PathBuf> {
