@@ -217,12 +217,13 @@ impl Server {
             None => info!(target: "lazymc", "Starting server..."),
         }
 
-        // Spawn server in new task
-        // TODO uncomment this and add config option
-        //Self::spawn_server_task(config, server);
-        // TODO actual error handling
-        os::unfreeze((*server.pid.lock().await).unwrap());
+        // TODO add config option for this
+        if let Some(pid) = *server.pid.lock().await {
+            return os::unfreeze(pid);
+        }
 
+        // Spawn server in new task
+        Self::spawn_server_task(config, server);
         true
     }
 
