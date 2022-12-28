@@ -8,15 +8,14 @@ homepage = "https://timvisee.com/projects/lazymc"
 repository = "https://gitlab.com/timvisee/lazymc"
 description = "Put your Minecraft server to rest when idle."
 keywords = ["minecraft", "server", "idle", "cli"]
-categories = [
-    "command-line-interface",
-    "games",
-]
-exclude = [
-    "/.github",
-    "/contrib",
-]
+categories = ["command-line-interface", "games"]
+exclude = ["/.github", "/contrib"]
 edition = "2021"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
 
 [features]
 default = ["rcon", "lobby"]
@@ -35,7 +34,14 @@ anyhow = "1.0"
 base64 = "0.13"
 bytes = "1.1"
 chrono = "0.4"
-clap = { version = "3.0", default-features = false, features = [ "std", "cargo", "color", "env", "suggestions", "unicode" ]}
+clap = { version = "3.0", default-features = false, features = [
+    "std",
+    "cargo",
+    "color",
+    "env",
+    "suggestions",
+    "unicode",
+] }
 colored = "2.0"
 derive_builder = "0.10"
 dotenv = "0.15"
@@ -53,7 +59,17 @@ serde = "1.0"
 serde_json = "1.0"
 shlex = "1.1"
 thiserror = "1.0"
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "io-util", "net", "macros", "time", "process", "signal", "sync", "fs"] }
+tokio = { version = "1", default-features = false, features = [
+    "rt-multi-thread",
+    "io-util",
+    "net",
+    "macros",
+    "time",
+    "process",
+    "signal",
+    "sync",
+    "fs",
+] }
 toml = "0.5"
 version-compare = "0.1"
 
@@ -69,4 +85,10 @@ uuid = { version = "0.7", optional = true, features = ["v3"] }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "processthreadsapi", "handleapi", "ntdef", "minwindef"] }
+winapi = { version = "0.3", features = [
+    "winuser",
+    "processthreadsapi",
+    "handleapi",
+    "ntdef",
+    "minwindef",
+] }
