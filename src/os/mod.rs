@@ -9,7 +9,7 @@ use nix::{sys::signal, unistd::Pid};
 #[allow(unreachable_code)]
 pub fn force_kill(pid: u32) -> bool {
     #[cfg(unix)]
-    return signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL) == Ok(());
+    return unix_signal(pid, signal::SIGKILL);
 
     #[cfg(windows)]
     unsafe {
@@ -27,7 +27,7 @@ pub fn force_kill(pid: u32) -> bool {
 #[allow(unreachable_code, dead_code, unused_variables)]
 pub fn kill_gracefully(pid: u32) -> bool {
     #[cfg(unix)]
-    return signal::kill(Pid::from_raw(pid as i32), signal::SIGTERM) == Ok(());
+    return unix_signal(pid, signal::SIGTERM);
 
     unimplemented!(
         "gracefully killing Minecraft server process not implemented on non-Unix platforms"
@@ -42,7 +42,7 @@ pub fn kill_gracefully(pid: u32) -> bool {
 #[allow(unreachable_code)]
 pub fn freeze(pid: u32) -> bool {
     #[cfg(unix)]
-    return signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP) == Ok(());
+    return unix_signal(pid, signal::SIGSTOP);
 
     unimplemented!(
         "Freezing the Minecraft server process is not implemented on non-Unix platforms."
@@ -57,9 +57,20 @@ pub fn freeze(pid: u32) -> bool {
 #[allow(unreachable_code)]
 pub fn unfreeze(pid: u32) -> bool {
     #[cfg(unix)]
-    return signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT) == Ok(());
+    return unix_signal(pid, signal::SIGCONT);
 
     unimplemented!(
         "Unfreezing the Minecraft server process is not implemented on non-Unix platforms."
     );
+}
+
+#[cfg(unix)]
+pub fn unix_signal(pid: u32, signal: signal::Signal) -> bool {
+    return match signal::kill(Pid::from_raw(pid as i32), signal) {
+        Ok(()) => true,
+        Err(err) => {
+            warn!(target: "lazymc", "Sending {signal} signal to server failed: {err}");
+            false
+        }
+    };
 }
