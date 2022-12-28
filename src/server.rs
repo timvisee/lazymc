@@ -601,11 +601,20 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
     }
 
     // Update from starting/started to stopping
+
+    /* TODO uncomment this and add a config option
     server
         .update_state_from(Some(State::Starting), State::Stopping, config)
         .await;
     server
         .update_state_from(Some(State::Started), State::Stopping, config)
+        .await;
+    */
+    server
+        .update_state_from(Some(State::Starting), State::Stopped, config)
+        .await;
+    server
+        .update_state_from(Some(State::Started), State::Stopped, config)
         .await;
 
     true
