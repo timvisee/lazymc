@@ -39,3 +39,37 @@ pub fn kill_gracefully(pid: u32) -> bool {
         "gracefully killing Minecraft server process not implemented on non-Unix platforms"
     );
 }
+
+/// Freeze process.
+/// Results in undefined behavior if PID is invaild.
+///
+/// # Panics
+/// Panics on platforms other than Unix.
+#[allow(unreachable_code)]
+pub fn freeze(pid: u32) -> bool {
+    #[cfg(unix)]
+    unsafe {
+        return unix::freeze(pid);
+    }
+
+    unimplemented!(
+        "Freezing the Minecraft server process is not implemented on non-Unix platforms."
+    );
+}
+
+/// Unfreeze process.
+/// Results in undefined behavior if PID is invaild.
+///
+/// # Panics
+/// Panics on platforms other than Unix.
+#[allow(unreachable_code)]
+pub fn unfreeze(pid: u32) -> bool {
+    #[cfg(unix)]
+    unsafe {
+        return unix::unfreeze(pid);
+    }
+
+    unimplemented!(
+        "Unfreezing the Minecraft server process is not implemented on non-Unix platforms."
+    );
+}

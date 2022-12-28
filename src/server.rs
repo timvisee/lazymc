@@ -218,7 +218,10 @@ impl Server {
         }
 
         // Spawn server in new task
-        Self::spawn_server_task(config, server);
+        // TODO uncomment this and add config option
+        //Self::spawn_server_task(config, server);
+        // TODO actual error handling
+        os::unfreeze((*server.pid.lock().await).unwrap());
 
         true
     }
@@ -587,9 +590,13 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
     };
 
     // Send kill signal
-    if !crate::os::kill_gracefully(pid) {
+    // TODO uncomment this and add a config option
+    /*if !crate::os::kill_gracefully(pid) {
         error!(target: "lazymc", "Failed to send stop signal to server process");
         return false;
+    }*/
+    if !os::freeze(pid) {
+        error!(target: "lazymc", "Failed to send freeze signal to server process.");
     }
 
     // Update from starting/started to stopping
