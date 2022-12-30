@@ -174,6 +174,11 @@ pub struct Server {
     )]
     pub address: SocketAddr,
 
+    /// Freeze the server process instead of restarting it when no players online, making it start up faster.
+    /// Only works on Unix (Linux or MacOS)
+    #[serde(default = "bool_true")]
+    pub freeze_process: bool,
+
     /// Immediately wake server when starting lazymc.
     #[serde(default)]
     pub wake_on_start: bool,
