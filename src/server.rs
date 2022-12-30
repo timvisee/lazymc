@@ -217,9 +217,10 @@ impl Server {
             None => info!(target: "lazymc", "Starting server..."),
         }
 
-        // TODO add config option for this
-        if let Some(pid) = *server.pid.lock().await {
-            return os::unfreeze(pid);
+        if config.server.freeze_process {
+            if let Some(pid) = *server.pid.lock().await {
+                return os::unfreeze(pid);
+            }
         }
 
         // Spawn server in new task
@@ -590,32 +591,30 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
         }
     };
 
-    // Send kill signal
-    // TODO uncomment this and add a config option
-    /*if !crate::os::kill_gracefully(pid) {
-        error!(target: "lazymc", "Failed to send stop signal to server process");
-        return false;
-    }*/
-    if !os::freeze(pid) {
-        error!(target: "lazymc", "Failed to send freeze signal to server process.");
+    if config.server.freeze_process {
+        if !os::freeze(pid) {
+            error!(target: "lazymc", "Failed to send freeze signal to server process.");
+        }
+
+        server
+            .update_state_from(Some(State::Starting), State::Stopped, config)
+            .await;
+        server
+            .update_state_from(Some(State::Started), State::Stopped, config)
+            .await;
+    } else {
+        if !crate::os::kill_gracefully(pid) {
+            error!(target: "lazymc", "Failed to send stop signal to server process");
+            return false;
+        }
+
+        server
+            .update_state_from(Some(State::Starting), State::Stopping, config)
+            .await;
+        server
+            .update_state_from(Some(State::Started), State::Stopping, config)
+            .await;
     }
-
-    // Update from starting/started to stopping
-
-    /* TODO uncomment this and add a config option
-    server
-        .update_state_from(Some(State::Starting), State::Stopping, config)
-        .await;
-    server
-        .update_state_from(Some(State::Started), State::Stopping, config)
-        .await;
-    */
-    server
-        .update_state_from(Some(State::Starting), State::Stopped, config)
-        .await;
-    server
-        .update_state_from(Some(State::Started), State::Stopped, config)
-        .await;
 
     true
 }
