@@ -14,7 +14,7 @@ Open a terminal, go to the server directory, and make sure you can execute it:
 .\lazymc --help
 ```
 
-When lazymc is ready, set up the [configuration](./res/lazymc.toml) and start it
+When lazymc is ready, set up the [configuration](../res/lazymc.toml) and start it
 up:
 
 ```bash
