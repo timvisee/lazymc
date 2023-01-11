@@ -35,7 +35,7 @@ anyhow = "1.0"
 base64 = "0.13"
 bytes = "1.1"
 chrono = "0.4"
-clap = { version = "3.0", default-features = false, features = [ "std", "cargo", "color", "env", "suggestions", "unicode" ]}
+clap = { version = "4.0.32", default-features = false, features = [ "std", "help", "suggestions", "color", "usage", "cargo", "env", "unicode" ]}
 colored = "2.0"
 derive_builder = "0.10"
 dotenv = "0.15"

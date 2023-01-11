@@ -8,7 +8,7 @@ use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
 /// Invoke config test command.
 pub fn invoke(matches: &ArgMatches) {
     // Get config path, attempt to canonicalize
-    let mut path = PathBuf::from(matches.value_of("config").unwrap());
+    let mut path = PathBuf::from(matches.get_one::<String>("config").unwrap());
     if let Ok(p) = path.canonicalize() {
         path = p;
     }

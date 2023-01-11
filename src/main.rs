@@ -29,7 +29,7 @@ pub(crate) mod util;
 
 use std::env;
 
-use clap::App;
+use clap::Command;
 
 // Compile time feature compatability check.
 #[cfg(all(windows, not(feature = "rcon")))]
@@ -63,7 +63,7 @@ fn init_log() {
 }
 
 /// Invoke an action.
-fn invoke_action(app: App) -> Result<(), ()> {
+fn invoke_action(app: Command) -> Result<(), ()> {
     let matches = app.get_matches();
 
     // Config operations
