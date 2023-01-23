@@ -22,7 +22,7 @@ const CONFIG_VERSION: &str = "0.2.8";
 /// Quits with an error message on failure.
 pub fn load(matches: &ArgMatches) -> Config {
     // Get config path, attempt to canonicalize
-    let mut path = PathBuf::from(matches.value_of("config").unwrap());
+    let mut path = PathBuf::from(matches.get_one::<String>("config").unwrap());
     if let Ok(p) = path.canonicalize() {
         path = p;
     }

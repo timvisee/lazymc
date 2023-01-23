@@ -1,23 +1,28 @@
-use clap::{App, AppSettings, Arg};
+use clap::{Arg, Command};
 
 /// The clap app for CLI argument parsing.
-pub fn app() -> App<'static> {
-    App::new(crate_name!())
+pub fn app() -> Command {
+    Command::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
         .subcommand(
-            App::new("start")
+            Command::new("start")
                 .alias("run")
                 .about("Start lazymc and server (default)"),
         )
         .subcommand(
-            App::new("config")
+            Command::new("config")
                 .alias("cfg")
                 .about("Config actions")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommand(App::new("generate").alias("gen").about("Generate config"))
-                .subcommand(App::new("test").about("Test config")),
+                .arg_required_else_help(true)
+                .subcommand_required(true)
+                .subcommand(
+                    Command::new("generate")
+                        .alias("gen")
+                        .about("Generate config"),
+                )
+                .subcommand(Command::new("test").about("Test config")),
         )
         .arg(
             Arg::new("config")
@@ -28,6 +33,6 @@ pub fn app() -> App<'static> {
                 .value_name("FILE")
                 .default_value(crate::config::CONFIG_FILE)
                 .help("Use config file")
-                .takes_value(true),
+                .num_args(1),
         )
 }
