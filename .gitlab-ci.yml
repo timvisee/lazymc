@@ -11,12 +11,6 @@ stages:
 variables:
   TARGET: x86_64-unknown-linux-gnu
 
-# Rust build cache configuration
-.rust-build-cache: &rust-build-cache
-  key: "$CI_PIPELINE_ID"
-  paths:
-    - target/
-
 # Install build dependencies
 before_script:
   - apt-get update
@@ -42,8 +36,6 @@ before_script:
 # Check on stable, beta and nightly 
 .check-base: &check-base
   stage: check
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo check --verbose
     - cargo check --no-default-features --verbose
@@ -67,8 +59,6 @@ check-windows:
 build-x86_64-linux-gnu:
   stage: build
   needs: []
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo build --target=$TARGET --release --locked --verbose
     - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
@@ -85,8 +75,6 @@ build-x86_64-linux-musl:
   needs: []
   variables:
     TARGET: x86_64-unknown-linux-musl
-  cache:
-    <<: *rust-build-cache
   script:
     - rustup target add $TARGET
     - cargo build --target=$TARGET --release --locked --verbose
@@ -108,8 +96,6 @@ build-armv7-linux-gnu:
   needs: []
   variables:
     TARGET: armv7-unknown-linux-gnueabihf
-  cache:
-    <<: *rust-build-cache
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends build-essential
@@ -143,8 +129,6 @@ build-aarch64-linux-gnu:
   needs: []
   variables:
     TARGET: aarch64-unknown-linux-gnu
-  cache:
-    <<: *rust-build-cache
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends build-essential
@@ -195,8 +179,6 @@ test-cargo-x86_64-linux-gnu:
   stage: test
   needs: []
   dependencies: []
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo test --locked --verbose
     - cargo test --locked --no-default-features --verbose
