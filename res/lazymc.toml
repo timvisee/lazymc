@@ -33,7 +33,7 @@ directory = "."
 # Warning: if using a bash script read: https://git.io/JMIKH
 command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 
-# Freeze the server process instead of restarting it when no players online, making it start up faster.
+# Freeze the server process instead of restarting it when no players online, making it resume faster.
 # Only works on Unix (Linux or MacOS)
 #freeze_process = true
 

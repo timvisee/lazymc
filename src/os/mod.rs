@@ -45,7 +45,7 @@ pub fn freeze(pid: u32) -> bool {
     return unix_signal(pid, signal::SIGSTOP);
 
     unimplemented!(
-        "Freezing the Minecraft server process is not implemented on non-Unix platforms."
+        "freezing the Minecraft server process is not implemented on non-Unix platforms"
     );
 }
 
@@ -60,7 +60,7 @@ pub fn unfreeze(pid: u32) -> bool {
     return unix_signal(pid, signal::SIGCONT);
 
     unimplemented!(
-        "Unfreezing the Minecraft server process is not implemented on non-Unix platforms."
+        "unfreezing the Minecraft server process is not implemented on non-Unix platforms"
     );
 }
 
