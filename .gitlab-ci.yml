@@ -32,7 +32,7 @@ before_script:
 .before_script-windows: &before_script-windows
   before_script:
     # Install scoop
-    - Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+    - iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
 
     # Install Rust
     - scoop install rustup gcc
