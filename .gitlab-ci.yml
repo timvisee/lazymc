@@ -224,7 +224,6 @@ release-gitlab-generic-package:
     - build-aarch64-linux-gnu
     - build-x86_64-windows
   only:
-    - master
     - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
@@ -255,7 +254,6 @@ release-gitlab-release:
   image: registry.gitlab.com/gitlab-org/release-cli
   stage: release
   only:
-    - master
     - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
@@ -282,7 +280,6 @@ release-gitlab-release:
 release-github:
   stage: release
   only:
-    - master
     - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   dependencies:
     - build-x86_64-linux-gnu
