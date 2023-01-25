@@ -55,6 +55,10 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 - Minecraft Java Edition 1.6+
 - On Windows: RCON (automatically managed)
 
+Build requirements:
+
+- Rust 1.60 (MSRV)
+
 _Note: You must have access to the system to run the `lazymc` binary. If you're
 using a Minecraft shared hosting provider with a custom dashboard, you likely
 won't be able to set this up._
@@ -67,7 +71,8 @@ _Note: these instructions are for Linux & macOS, for Windows look
 Make sure you meet all [requirements](#requirements).
 
 Download the appropriate binary for your system from the [latest
-release][latest-release] page.
+release][latest-release] page. On macOS you must [compile from
+source](#compile-from-source).
 
 Place the binary in your Minecraft server directory, rename it if you like.
 Open a terminal, go to the directory, and make sure you can invoke it:

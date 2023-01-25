@@ -7,20 +7,23 @@ stages:
   - pre-release
   - release
 
+default:
+  tags:
+    - linux
+    - timvisee-linux
+
 # Variable defaults
 variables:
+  RUST_VERSION: stable
   TARGET: x86_64-unknown-linux-gnu
-
-# Rust build cache configuration
-.rust-build-cache: &rust-build-cache
-  key: "$CI_PIPELINE_ID"
-  paths:
-    - target/
 
 # Install build dependencies
 before_script:
   - apt-get update
   - apt-get install -y --no-install-recommends build-essential
+  - |
+    rustup install $RUST_VERSION
+    rustup default $RUST_VERSION
   - |
     rustc --version
     cargo --version
@@ -29,7 +32,7 @@ before_script:
 .before_script-windows: &before_script-windows
   before_script:
     # Install scoop
-    - Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+    - iex "& {$(irm get.scoop.sh)} -RunAsAdmin"
 
     # Install Rust
     - scoop install rustup gcc
@@ -42,45 +45,24 @@ before_script:
 # Check on stable, beta and nightly 
 .check-base: &check-base
   stage: check
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo check --verbose
     - cargo check --no-default-features --verbose
     - cargo check --no-default-features --features rcon --verbose
     - cargo check --no-default-features --features lobby --verbose
-check:
+check-stable:
   <<: *check-base
-check-macos:
-  tags:
-    - macos
+check-msrv:
+  <<: *check-base
+  variables:
+    RUST_VERSION: 1.60.0
   only:
     - master
-    - /^v(\d+\.)*\d+$/
-  before_script:
-    - rustup default stable
-    - |
-      rustc --version
-      cargo --version
-  <<: *check-base
-check-windows:
-  stage: check
-  tags:
-    - windows
-  allow_failure: true
-  cache: {}
-  <<: *before_script-windows
-  script:
-    - cargo check --locked --verbose
-    - cargo check --locked --no-default-features --features rcon --verbose
-    - cargo check --locked --no-default-features --features rcon,lobby --verbose
 
 # Build using Rust stable on Linux
 build-x86_64-linux-gnu:
   stage: build
   needs: []
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo build --target=$TARGET --release --locked --verbose
     - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
@@ -94,11 +76,11 @@ build-x86_64-linux-gnu:
 # Build a static version
 build-x86_64-linux-musl:
   stage: build
+  only:
+    - master
   needs: []
   variables:
     TARGET: x86_64-unknown-linux-musl
-  cache:
-    <<: *rust-build-cache
   script:
     - rustup target add $TARGET
     - cargo build --target=$TARGET --release --locked --verbose
@@ -117,11 +99,11 @@ build-x86_64-linux-musl:
 build-armv7-linux-gnu:
   stage: build
   image: ubuntu
+  only:
+    - master
   needs: []
   variables:
     TARGET: armv7-unknown-linux-gnueabihf
-  cache:
-    <<: *rust-build-cache
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends build-essential
@@ -152,11 +134,11 @@ build-armv7-linux-gnu:
 build-aarch64-linux-gnu:
   stage: build
   image: ubuntu
+  only:
+    - master
   needs: []
   variables:
     TARGET: aarch64-unknown-linux-gnu
-  cache:
-    <<: *rust-build-cache
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends build-essential
@@ -183,36 +165,13 @@ build-aarch64-linux-gnu:
       - lazymc-$TARGET
     expire_in: 1 month
 
-# Build using Rust stable on macOS
-build-macos:
-  stage: build
-  tags:
-    - macos
-  only:
-    - master
-    - /^v(\d+\.)*\d+$/
-  needs: []
-  variables:
-    TARGET: x86_64-apple-darwin
-  before_script:
-    - rustup default stable
-    - |
-      rustc --version
-      cargo --version
-  script:
-    - cargo build --target=$TARGET --release --locked --verbose
-    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
-  artifacts:
-    name: lazymc-x86_64-macos
-    paths:
-      - lazymc-$TARGET
-    expire_in: 1 month
-
 # Build using Rust stable on Windows
 build-x86_64-windows:
   stage: build
   tags:
     - windows
+  only:
+    - master
   allow_failure: true
   needs: []
   variables:
@@ -230,30 +189,29 @@ build-x86_64-windows:
 # Run the unit tests through Cargo on Linux
 test-cargo-x86_64-linux-gnu:
   stage: test
+  only:
+    - master
   needs: []
   dependencies: []
-  cache:
-    <<: *rust-build-cache
   script:
     - cargo test --locked --verbose
     - cargo test --locked --no-default-features --verbose
     - cargo test --locked --no-default-features --features rcon --verbose
     - cargo test --locked --no-default-features --features lobby --verbose
 
-# Run the unit tests through Cargo on Windows
-test-cargo-x86_64-windows:
-  stage: test
-  tags:
-    - windows
-  allow_failure: true
-  needs: []
-  dependencies: []
-  cache: {}
-  <<: *before_script-windows
-  script:
-    - cargo test --locked --verbose
-    - cargo test --locked --no-default-features --features rcon --verbose
-    - cargo test --locked --no-default-features --features rcon,lobby --verbose
+# # Run the unit tests through Cargo on Windows
+# test-cargo-x86_64-windows:
+#   stage: test
+#   tags:
+#     - windows
+#   allow_failure: true
+#   needs: []
+#   dependencies: []
+#   <<: *before_script-windows
+#   script:
+#     - cargo test --locked --verbose
+#     - cargo test --locked --no-default-features --features rcon --verbose
+#     - cargo test --locked --no-default-features --features rcon,lobby --verbose
 
 # Release binaries on GitLab as generic package
 release-gitlab-generic-package:
@@ -264,16 +222,14 @@ release-gitlab-generic-package:
     - build-x86_64-linux-musl
     - build-armv7-linux-gnu
     - build-aarch64-linux-gnu
-    - build-macos
     - build-x86_64-windows
   only:
-    - /^v(\d+\.)*\d+$/
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
     LINUX_ARMV7_GNU_BIN: "lazymc-armv7-unknown-linux-gnueabihf"
     LINUX_AARCH64_GNU_BIN: "lazymc-aarch64-unknown-linux-gnu"
-    MACOS_BIN: "lazymc-x86_64-apple-darwin"
     WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
   before_script: []
   script:
@@ -291,8 +247,6 @@ release-gitlab-generic-package:
     - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_AARCH64_GNU_BIN} ${PACKAGE_REGISTRY_URL}/${LINUX_AARCH64_GNU_BIN}
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${MACOS_BIN} ${PACKAGE_REGISTRY_URL}/${MACOS_BIN}
-    - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${WINDOWS_BIN} ${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}
 
 # Publish GitLab release
@@ -300,13 +254,12 @@ release-gitlab-release:
   image: registry.gitlab.com/gitlab-org/release-cli
   stage: release
   only:
-    - /^v(\d+\.)*\d+$/
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
     LINUX_ARMV7_GNU_BIN: "lazymc-armv7-unknown-linux-gnueabihf"
     LINUX_AARCH64_GNU_BIN: "lazymc-aarch64-unknown-linux-gnu"
-    MACOS_BIN: "lazymc-x86_64-apple-darwin"
     WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
   before_script: []
   script:
@@ -321,20 +274,18 @@ release-gitlab-release:
         --assets-link "{\"name\":\"${LINUX_MUSL_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_MUSL_BIN}\"}" \
         --assets-link "{\"name\":\"${LINUX_ARMV7_GNU_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_ARMV7_GNU_BIN}\"}" \
         --assets-link "{\"name\":\"${LINUX_AARCH64_GNU_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_AARCH64_GNU_BIN}\"}" \
-        --assets-link "{\"name\":\"${MACOS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${MACOS_BIN}\"}" \
         --assets-link "{\"name\":\"${WINDOWS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}\"}"
 
 # Publish GitHub release
 release-github:
   stage: release
   only:
-    - /^v(\d+\.)*\d+$/
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   dependencies:
     - build-x86_64-linux-gnu
     - build-x86_64-linux-musl
     - build-armv7-linux-gnu
     - build-aarch64-linux-gnu
-    - build-macos
     - build-x86_64-windows
   before_script: []
   script:
@@ -353,5 +304,4 @@ release-github:
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-unknown-linux-musl --name lazymc-$CI_COMMIT_REF_NAME-linux-x64-static
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-armv7-unknown-linux-gnueabihf --name lazymc-$CI_COMMIT_REF_NAME-linux-armv7
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-aarch64-unknown-linux-gnu --name lazymc-$CI_COMMIT_REF_NAME-linux-aarch64
-    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-apple-darwin --name lazymc-$CI_COMMIT_REF_NAME-macos
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-pc-windows-msvc.exe --name lazymc-$CI_COMMIT_REF_NAME-windows.exe
