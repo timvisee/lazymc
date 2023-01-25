@@ -9,12 +9,16 @@ stages:
 
 # Variable defaults
 variables:
+  RUST_VERSION: stable
   TARGET: x86_64-unknown-linux-gnu
 
 # Install build dependencies
 before_script:
   - apt-get update
   - apt-get install -y --no-install-recommends build-essential
+  - |
+    rustup install $RUST_VERSION
+    rustup default $RUST_VERSION
   - |
     rustc --version
     cargo --version
@@ -41,8 +45,12 @@ before_script:
     - cargo check --no-default-features --verbose
     - cargo check --no-default-features --features rcon --verbose
     - cargo check --no-default-features --features lobby --verbose
-check:
+check-stable:
   <<: *check-base
+check-msrv:
+  <<: *check-base
+  variables:
+    RUST_VERSION: 1.60.0
 
 # Build using Rust stable on Linux
 build-x86_64-linux-gnu:

@@ -55,6 +55,10 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 - Minecraft Java Edition 1.6+
 - On Windows: RCON (automatically managed)
 
+Build requirements:
+
+- Rust 1.60 (MSRV)
+
 _Note: You must have access to the system to run the `lazymc` binary. If you're
 using a Minecraft shared hosting provider with a custom dashboard, you likely
 won't be able to set this up._
