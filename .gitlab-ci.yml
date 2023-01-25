@@ -56,6 +56,8 @@ check-msrv:
   <<: *check-base
   variables:
     RUST_VERSION: 1.60.0
+  only:
+    - master
 
 # Build using Rust stable on Linux
 build-x86_64-linux-gnu:
@@ -74,6 +76,8 @@ build-x86_64-linux-gnu:
 # Build a static version
 build-x86_64-linux-musl:
   stage: build
+  only:
+    - master
   needs: []
   variables:
     TARGET: x86_64-unknown-linux-musl
@@ -95,6 +99,8 @@ build-x86_64-linux-musl:
 build-armv7-linux-gnu:
   stage: build
   image: ubuntu
+  only:
+    - master
   needs: []
   variables:
     TARGET: armv7-unknown-linux-gnueabihf
@@ -128,6 +134,8 @@ build-armv7-linux-gnu:
 build-aarch64-linux-gnu:
   stage: build
   image: ubuntu
+  only:
+    - master
   needs: []
   variables:
     TARGET: aarch64-unknown-linux-gnu
@@ -162,6 +170,8 @@ build-x86_64-windows:
   stage: build
   tags:
     - windows
+  only:
+    - master
   allow_failure: true
   needs: []
   variables:
@@ -179,6 +189,8 @@ build-x86_64-windows:
 # Run the unit tests through Cargo on Linux
 test-cargo-x86_64-linux-gnu:
   stage: test
+  only:
+    - master
   needs: []
   dependencies: []
   script:
@@ -212,7 +224,8 @@ release-gitlab-generic-package:
     - build-aarch64-linux-gnu
     - build-x86_64-windows
   only:
-    - /^v(\d+\.)*\d+$/
+    - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
@@ -242,7 +255,8 @@ release-gitlab-release:
   image: registry.gitlab.com/gitlab-org/release-cli
   stage: release
   only:
-    - /^v(\d+\.)*\d+$/
+    - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   variables:
     LINUX_GNU_BIN: "lazymc-x86_64-unknown-linux-gnu"
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
@@ -268,7 +282,8 @@ release-gitlab-release:
 release-github:
   stage: release
   only:
-    - /^v(\d+\.)*\d+$/
+    - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   dependencies:
     - build-x86_64-linux-gnu
     - build-x86_64-linux-musl
