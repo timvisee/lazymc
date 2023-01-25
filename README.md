@@ -67,7 +67,8 @@ _Note: these instructions are for Linux & macOS, for Windows look
 Make sure you meet all [requirements](#requirements).
 
 Download the appropriate binary for your system from the [latest
-release][latest-release] page.
+release][latest-release] page. On macOS you must [compile from
+source](#compile-from-source).
 
 Place the binary in your Minecraft server directory, rename it if you like.
 Open a terminal, go to the directory, and make sure you can invoke it:

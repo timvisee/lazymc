@@ -51,18 +51,6 @@ before_script:
     - cargo check --no-default-features --features lobby --verbose
 check:
   <<: *check-base
-check-macos:
-  tags:
-    - macos
-  only:
-    - master
-    - /^v(\d+\.)*\d+$/
-  before_script:
-    - rustup default stable
-    - |
-      rustc --version
-      cargo --version
-  <<: *check-base
 check-windows:
   stage: check
   tags:
@@ -183,31 +171,6 @@ build-aarch64-linux-gnu:
       - lazymc-$TARGET
     expire_in: 1 month
 
-# Build using Rust stable on macOS
-build-macos:
-  stage: build
-  tags:
-    - macos
-  only:
-    - master
-    - /^v(\d+\.)*\d+$/
-  needs: []
-  variables:
-    TARGET: x86_64-apple-darwin
-  before_script:
-    - rustup default stable
-    - |
-      rustc --version
-      cargo --version
-  script:
-    - cargo build --target=$TARGET --release --locked --verbose
-    - mv target/$TARGET/release/lazymc ./lazymc-$TARGET
-  artifacts:
-    name: lazymc-x86_64-macos
-    paths:
-      - lazymc-$TARGET
-    expire_in: 1 month
-
 # Build using Rust stable on Windows
 build-x86_64-windows:
   stage: build
@@ -264,7 +227,6 @@ release-gitlab-generic-package:
     - build-x86_64-linux-musl
     - build-armv7-linux-gnu
     - build-aarch64-linux-gnu
-    - build-macos
     - build-x86_64-windows
   only:
     - /^v(\d+\.)*\d+$/
@@ -273,7 +235,6 @@ release-gitlab-generic-package:
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
     LINUX_ARMV7_GNU_BIN: "lazymc-armv7-unknown-linux-gnueabihf"
     LINUX_AARCH64_GNU_BIN: "lazymc-aarch64-unknown-linux-gnu"
-    MACOS_BIN: "lazymc-x86_64-apple-darwin"
     WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
   before_script: []
   script:
@@ -291,8 +252,6 @@ release-gitlab-generic-package:
     - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${LINUX_AARCH64_GNU_BIN} ${PACKAGE_REGISTRY_URL}/${LINUX_AARCH64_GNU_BIN}
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${MACOS_BIN} ${PACKAGE_REGISTRY_URL}/${MACOS_BIN}
-    - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${WINDOWS_BIN} ${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}
 
 # Publish GitLab release
@@ -306,7 +265,6 @@ release-gitlab-release:
     LINUX_MUSL_BIN: "lazymc-x86_64-unknown-linux-musl"
     LINUX_ARMV7_GNU_BIN: "lazymc-armv7-unknown-linux-gnueabihf"
     LINUX_AARCH64_GNU_BIN: "lazymc-aarch64-unknown-linux-gnu"
-    MACOS_BIN: "lazymc-x86_64-apple-darwin"
     WINDOWS_BIN: "lazymc-x86_64-pc-windows-msvc.exe"
   before_script: []
   script:
@@ -321,7 +279,6 @@ release-gitlab-release:
         --assets-link "{\"name\":\"${LINUX_MUSL_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_MUSL_BIN}\"}" \
         --assets-link "{\"name\":\"${LINUX_ARMV7_GNU_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_ARMV7_GNU_BIN}\"}" \
         --assets-link "{\"name\":\"${LINUX_AARCH64_GNU_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${LINUX_AARCH64_GNU_BIN}\"}" \
-        --assets-link "{\"name\":\"${MACOS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${MACOS_BIN}\"}" \
         --assets-link "{\"name\":\"${WINDOWS_BIN}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${WINDOWS_BIN}\"}"
 
 # Publish GitHub release
@@ -334,7 +291,6 @@ release-github:
     - build-x86_64-linux-musl
     - build-armv7-linux-gnu
     - build-aarch64-linux-gnu
-    - build-macos
     - build-x86_64-windows
   before_script: []
   script:
@@ -353,5 +309,4 @@ release-github:
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-unknown-linux-musl --name lazymc-$CI_COMMIT_REF_NAME-linux-x64-static
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-armv7-unknown-linux-gnueabihf --name lazymc-$CI_COMMIT_REF_NAME-linux-armv7
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-aarch64-unknown-linux-gnu --name lazymc-$CI_COMMIT_REF_NAME-linux-aarch64
-    - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-apple-darwin --name lazymc-$CI_COMMIT_REF_NAME-macos
     - ./github-release upload --token "$GITHUB_TOKEN" --owner timvisee --repo lazymc --tag "$CI_COMMIT_REF_NAME" --file ./lazymc-x86_64-pc-windows-msvc.exe --name lazymc-$CI_COMMIT_REF_NAME-windows.exe
