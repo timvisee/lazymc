@@ -217,10 +217,10 @@ impl Server {
             None => info!(target: "lazymc", "Starting server..."),
         }
 
-        if config.server.freeze_process {
-            if let Some(pid) = *server.pid.lock().await {
-                return os::unfreeze(pid);
-            }
+        // Unfreeze server if it is frozen
+        #[cfg(unix)]
+        if config.server.freeze_process && unfreeze_server_signal(&config, &server).await {
+            return true;
         }
 
         // Spawn server in new task
@@ -240,6 +240,12 @@ impl Server {
     /// This will attempt to stop the server with all available methods.
     #[allow(unused_variables)]
     pub async fn stop(&self, config: &Config) -> bool {
+        // Try to freeze through signal
+        #[cfg(unix)]
+        if config.server.freeze_process && freeze_server_signal(config, self).await {
+            return true;
+        }
+
         // Try to stop through RCON if started
         #[cfg(feature = "rcon")]
         if self.state() == State::Started && stop_server_rcon(config, self).await {
@@ -591,30 +597,73 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
         }
     };
 
-    if config.server.freeze_process {
-        if !os::freeze(pid) {
-            error!(target: "lazymc", "Failed to send freeze signal to server process.");
-        }
+    if !crate::os::kill_gracefully(pid) {
+        error!(target: "lazymc", "Failed to send stop signal to server process");
+        return false;
+    }
 
-        server
-            .update_state_from(Some(State::Starting), State::Stopped, config)
-            .await;
-        server
-            .update_state_from(Some(State::Started), State::Stopped, config)
-            .await;
-    } else {
-        if !crate::os::kill_gracefully(pid) {
-            error!(target: "lazymc", "Failed to send stop signal to server process");
+    server
+        .update_state_from(Some(State::Starting), State::Stopping, config)
+        .await;
+    server
+        .update_state_from(Some(State::Started), State::Stopping, config)
+        .await;
+
+    true
+}
+
+/// Freeze server by sending SIGSTOP signal.
+///
+/// Only available on Unix.
+#[cfg(unix)]
+async fn freeze_server_signal(config: &Config, server: &Server) -> bool {
+    // Grab PID
+    let pid = match *server.pid.lock().await {
+        Some(pid) => pid,
+        None => {
+            debug!(target: "lazymc", "Could not send freeze signal to server process, PID unknown");
             return false;
         }
+    };
 
-        server
-            .update_state_from(Some(State::Starting), State::Stopping, config)
-            .await;
-        server
-            .update_state_from(Some(State::Started), State::Stopping, config)
-            .await;
+    if !os::freeze(pid) {
+        error!(target: "lazymc", "Failed to send freeze signal to server process.");
     }
+
+    server
+        .update_state_from(Some(State::Starting), State::Stopped, config)
+        .await;
+    server
+        .update_state_from(Some(State::Started), State::Stopped, config)
+        .await;
+
+    true
+}
+
+/// Unfreeze server by sending SIGCONT signal.
+///
+/// Only available on Unix.
+#[cfg(unix)]
+async fn unfreeze_server_signal(config: &Config, server: &Server) -> bool {
+    // Grab PID
+    let pid = match *server.pid.lock().await {
+        Some(pid) => pid,
+        None => {
+            debug!(target: "lazymc", "Could not send unfreeze signal to server process, PID unknown");
+            return false;
+        }
+    };
+
+    if !os::unfreeze(pid) {
+        error!(target: "lazymc", "Failed to send unfreeze signal to server process.");
+    }
+
+    server
+        .update_state_from(Some(State::Stopped), State::Started, config)
+        .await;
+    server
+        .update_state_from(Some(State::Starting), State::Started, config)
+        .await;
 
     true
 }
