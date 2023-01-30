@@ -659,10 +659,10 @@ async fn unfreeze_server_signal(config: &Config, server: &Server) -> bool {
     }
 
     server
-        .update_state_from(Some(State::Stopped), State::Started, config)
+        .update_state_from(Some(State::Stopping), State::Starting, config)
         .await;
     server
-        .update_state_from(Some(State::Starting), State::Started, config)
+        .update_state_from(Some(State::Stopped), State::Starting, config)
         .await;
 
     true
