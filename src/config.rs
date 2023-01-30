@@ -57,13 +57,6 @@ pub fn load(matches: &ArgMatches) -> Config {
         }
     };
 
-    // TODO better way to do this
-    #[cfg(windows)]
-    {
-        // Don't try to use unix APIs on windows
-        config.server.freeze_process = false;
-    }
-
     config
 }
 
