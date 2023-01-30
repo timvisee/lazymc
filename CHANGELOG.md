@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.8 (2023-01-30)
+
+- Add `freeze_process` feature on Unix platforms to freeze a sleeping server
+  rather than shutting it down.
+- Update default Minecraft version to 1.19.3
+- Remove macOS builds from releases, users can compile from source
+- Update dependencies
+
 ## 0.2.7 (2021-12-13)
 
 - Update default Minecraft version to 1.18.1
