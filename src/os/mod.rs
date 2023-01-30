@@ -1,6 +1,7 @@
 #[cfg(windows)]
 pub mod windows;
 
+#[cfg(unix)]
 use nix::{sys::signal, unistd::Pid};
 
 /// Force kill process.
