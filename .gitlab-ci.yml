@@ -36,6 +36,8 @@ before_script:
 
     # Install Rust
     - scoop install rustup gcc
+    - rustup install $RUST_VERSION
+    - rustup default $RUST_VERSION
     - rustc --version
     - cargo --version
 
