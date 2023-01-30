@@ -80,6 +80,7 @@ build-x86_64-linux-musl:
   stage: build
   only:
     - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   needs: []
   variables:
     TARGET: x86_64-unknown-linux-musl
@@ -103,6 +104,7 @@ build-armv7-linux-gnu:
   image: ubuntu
   only:
     - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   needs: []
   variables:
     TARGET: armv7-unknown-linux-gnueabihf
@@ -138,6 +140,7 @@ build-aarch64-linux-gnu:
   image: ubuntu
   only:
     - master
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   needs: []
   variables:
     TARGET: aarch64-unknown-linux-gnu
@@ -174,7 +177,7 @@ build-x86_64-windows:
     - windows
   only:
     - master
-  allow_failure: true
+    - /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/
   needs: []
   variables:
     TARGET: x86_64-pc-windows-msvc
@@ -206,7 +209,6 @@ test-cargo-x86_64-linux-gnu:
 #   stage: test
 #   tags:
 #     - windows
-#   allow_failure: true
 #   needs: []
 #   dependencies: []
 #   <<: *before_script-windows
