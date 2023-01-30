@@ -18,7 +18,7 @@ pub fn offline_player_uuid(username: &str) -> Uuid {
 ///
 /// Static factory to retrieve a type 3 (name based) `Uuid` based on the specified byte array.
 ///
-/// Ported from: https://git.io/J1b6A
+/// Ported from: <https://git.io/J1b6A>
 fn java_name_uuid_from_bytes(data: &[u8]) -> Uuid {
     let mut hasher = Md5::new();
     hasher.update(data);

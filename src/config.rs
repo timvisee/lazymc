@@ -174,6 +174,11 @@ pub struct Server {
     )]
     pub address: SocketAddr,
 
+    /// Freeze the server process instead of restarting it when no players online, making it start up faster.
+    /// Only works on Unix (Linux or MacOS)
+    #[serde(default = "bool_true")]
+    pub freeze_process: bool,
+
     /// Immediately wake server when starting lazymc.
     #[serde(default)]
     pub wake_on_start: bool,
@@ -478,17 +483,11 @@ impl Default for Advanced {
 }
 
 /// Config configuration.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 pub struct ConfigConfig {
     /// Configuration for lazymc version.
     pub version: Option<String>,
-}
-
-impl Default for ConfigConfig {
-    fn default() -> Self {
-        Self { version: None }
-    }
 }
 
 fn option_pathbuf_dot() -> Option<PathBuf> {

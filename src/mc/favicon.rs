@@ -1,3 +1,5 @@
+use base64::Engine;
+
 use crate::proto::client::ClientInfo;
 
 /// Protocol version since when favicons are supported.
@@ -12,7 +14,11 @@ pub fn default_favicon() -> String {
 ///
 /// This assumes the favicon data to be a valid PNG image.
 pub fn encode_favicon(data: &[u8]) -> String {
-    format!("{}{}", "data:image/png;base64,", base64::encode(data))
+    format!(
+        "{}{}",
+        "data:image/png;base64,",
+        base64::engine::general_purpose::STANDARD.encode(data)
+    )
 }
 
 /// Check whether the status response favicon is supported based on the given client info.

@@ -42,7 +42,7 @@ const SERVER_JOIN_GAME_TIMEOUT: Duration = Duration::from_secs(20);
 ///
 /// Notchian servers are slow, we must wait a little before sending play packets, because the
 /// server needs time to transition the client into this state.
-/// See warning at: https://wiki.vg/Protocol#Login_Success
+/// See warning at: <https://wiki.vg/Protocol#Login_Success>
 const SERVER_WARMUP: Duration = Duration::from_secs(1);
 
 /// Serve lobby service for given client connection.

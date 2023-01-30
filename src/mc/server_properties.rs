@@ -114,7 +114,7 @@ fn rewrite_contents(contents: String, mut changes: HashMap<&str, String>) -> Opt
             }
 
             // Try to split property
-            let (key, value) = match line.split_once("=") {
+            let (key, value) = match line.split_once('=') {
                 Some(result) => result,
                 None => return line,
             };

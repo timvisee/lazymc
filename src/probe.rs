@@ -157,11 +157,7 @@ async fn connect_to_server_no_timeout(
 
     // Select server address to use, add magic if Forge
     let server_addr = if config.server.forge {
-        format!(
-            "{}{}",
-            config.server.address.ip().to_string(),
-            forge::STATUS_MAGIC,
-        )
+        format!("{}{}", config.server.address.ip(), forge::STATUS_MAGIC)
     } else {
         config.server.address.ip().to_string()
     };

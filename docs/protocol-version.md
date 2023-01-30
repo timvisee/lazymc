@@ -21,8 +21,8 @@ In lazymc you may configure what protocol version to use:
 # Server version & protocol hint.
 # Sent to clients until actual server version is known.
 # See: https://git.io/J1Fvx
-version = "1.18.1"
-protocol = 757
+version = "1.19.3"
+protocol = 761
 
 # -- snip --
 ```

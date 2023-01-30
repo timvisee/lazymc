@@ -1,7 +1,7 @@
-#[cfg(unix)]
-pub mod unix;
 #[cfg(windows)]
 pub mod windows;
+
+use nix::{sys::signal, unistd::Pid};
 
 /// Force kill process.
 ///
@@ -9,9 +9,7 @@ pub mod windows;
 #[allow(unreachable_code)]
 pub fn force_kill(pid: u32) -> bool {
     #[cfg(unix)]
-    unsafe {
-        return unix::force_kill(pid);
-    }
+    return unix_signal(pid, signal::SIGKILL);
 
     #[cfg(windows)]
     unsafe {
@@ -22,20 +20,57 @@ pub fn force_kill(pid: u32) -> bool {
 }
 
 /// Gracefully kill process.
-///
 /// Results in undefined behavior if PID is invalid.
 ///
 /// # Panics
-///
 /// Panics on platforms other than Unix.
 #[allow(unreachable_code, dead_code, unused_variables)]
 pub fn kill_gracefully(pid: u32) -> bool {
     #[cfg(unix)]
-    unsafe {
-        return unix::kill_gracefully(pid);
-    }
+    return unix_signal(pid, signal::SIGTERM);
 
     unimplemented!(
         "gracefully killing Minecraft server process not implemented on non-Unix platforms"
     );
+}
+
+/// Freeze process.
+/// Results in undefined behavior if PID is invaild.
+///
+/// # Panics
+/// Panics on platforms other than Unix.
+#[allow(unreachable_code)]
+pub fn freeze(pid: u32) -> bool {
+    #[cfg(unix)]
+    return unix_signal(pid, signal::SIGSTOP);
+
+    unimplemented!(
+        "freezing the Minecraft server process is not implemented on non-Unix platforms"
+    );
+}
+
+/// Unfreeze process.
+/// Results in undefined behavior if PID is invaild.
+///
+/// # Panics
+/// Panics on platforms other than Unix.
+#[allow(unreachable_code)]
+pub fn unfreeze(pid: u32) -> bool {
+    #[cfg(unix)]
+    return unix_signal(pid, signal::SIGCONT);
+
+    unimplemented!(
+        "unfreezing the Minecraft server process is not implemented on non-Unix platforms"
+    );
+}
+
+#[cfg(unix)]
+pub fn unix_signal(pid: u32, signal: signal::Signal) -> bool {
+    return match signal::kill(Pid::from_raw(pid as i32), signal) {
+        Ok(()) => true,
+        Err(err) => {
+            warn!(target: "lazymc", "Sending {signal} signal to server failed: {err}");
+            false
+        }
+    };
 }

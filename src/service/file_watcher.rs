@@ -151,10 +151,9 @@ fn reload_whitelist(config: &Config, server: &Server, dir: &Path) {
     }
 
     // Must be enabled in server.properties
-    let enabled =
-        server_properties::read_property(&dir.join(server_properties::FILE), "white-list")
-            .map(|v| v.trim() == "true")
-            .unwrap_or(false);
+    let enabled = server_properties::read_property(dir.join(server_properties::FILE), "white-list")
+        .map(|v| v.trim() == "true")
+        .unwrap_or(false);
     if !enabled {
         server.set_whitelist_blocking(None);
         debug!(target: "lazymc", "Not using whitelist, not enabled in {}", server_properties::FILE);
