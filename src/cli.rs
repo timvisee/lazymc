@@ -25,6 +25,14 @@ pub fn app() -> Command {
                 .subcommand(Command::new("test").about("Test config")),
         )
         .arg(
+            Arg::new("bind")
+                .short('b')
+                .value_name("ADDRESS")
+                .default_value("0.0.0.0:25565")
+                .help("Address to bind to")
+                .num_args(1),
+        )
+        .arg(
             Arg::new("config")
                 .short('c')
                 .alias("cfg")

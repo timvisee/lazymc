@@ -17,21 +17,38 @@ pub const CONFIG_FILE: &str = "lazymc.toml";
 /// Configuration version user should be using, or warning will be shown.
 const CONFIG_VERSION: &str = "0.2.8";
 
-/// Load config from file, based on CLI arguments.
-///
-/// Quits with an error message on failure.
-pub fn load(matches: &ArgMatches) -> Config {
+pub fn load(matches: &ArgMatches) -> Vec<Config> {
     // Get config path, attempt to canonicalize
     let mut path = PathBuf::from(matches.get_one::<String>("config").unwrap());
     if let Ok(p) = path.canonicalize() {
         path = p;
     }
 
-    // Ensure configuration file exists
-    if !path.is_file() {
+    let paths: Vec<PathBuf> = if path.is_dir() {
+        path.read_dir()
+            .unwrap()
+            .filter_map(|entry| {
+                entry.ok().and_then(|entry| {
+                    let path = entry.path();
+                    if path.is_file() {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    } else if path.is_file() {
+        vec![path.clone()]
+    } else {
+        vec![]
+    };
+
+    // Ensure configuration file/directory exists
+    if paths.len() == 0 {
         quit_error_msg(
             format!(
-                "Config file does not exist: {}",
+                "Config file/directory does not exist: {}",
                 path.to_str().unwrap_or("?")
             ),
             ErrorHintsBuilder::default()
@@ -42,6 +59,13 @@ pub fn load(matches: &ArgMatches) -> Config {
         );
     }
 
+    paths.into_iter().map(|path| load_file(path)).collect()
+}
+
+/// Load config from file, based on CLI arguments.
+///
+/// Quits with an error message on failure.
+pub fn load_file(path: PathBuf) -> Config {
     // Load config
     let config = match Config::load(path) {
         Ok(config) => config,
@@ -135,8 +159,8 @@ impl Config {
 #[serde(default)]
 pub struct Public {
     /// Public address.
-    #[serde(deserialize_with = "to_socket_addrs")]
-    pub address: SocketAddr,
+    // #[serde(deserialize_with = "to_socket_addrs")]
+    pub address: String, // SocketAddr,
 
     /// Minecraft protocol version name hint.
     pub version: String,
