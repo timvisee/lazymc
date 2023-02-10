@@ -28,12 +28,17 @@ pub fn load(matches: &ArgMatches) -> Vec<Config> {
         path.read_dir()
             .unwrap()
             .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path()).collect()
+            .map(|entry| entry.path())
+            .collect()
     } else {
         vec![path.clone()]
     };
 
-    let configs: Vec<Config> = paths.into_iter().filter(|path| path.is_file()).map(load_file).collect();
+    let configs: Vec<Config> = paths
+        .into_iter()
+        .filter(|path| path.is_file())
+        .map(load_file)
+        .collect();
 
     // Ensure configuration file/directory exists
     if configs.is_empty() {
