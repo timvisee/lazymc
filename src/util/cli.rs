@@ -10,7 +10,7 @@ use crate::util::error::{quit_error, ErrorHints};
 /// excluding the `:` suffix.
 pub fn prompt(msg: &str) -> String {
     // Show the prompt
-    eprint!("{}: ", msg);
+    eprint!("{msg}: ");
     let _ = stderr().flush();
 
     // Get the input
@@ -49,7 +49,7 @@ pub fn prompt_yes(msg: &str, def: Option<bool>) -> bool {
     );
 
     // Get the user input
-    let answer = prompt(&format!("{} {}", msg, options));
+    let answer = prompt(&format!("{msg} {options}"));
 
     // Assume the default if the answer is empty
     if answer.is_empty() {

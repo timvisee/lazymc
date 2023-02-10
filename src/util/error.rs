@@ -16,7 +16,7 @@ pub fn print_error(err: anyhow::Error) {
     // Report each printable error, count them
     let count = err
         .chain()
-        .map(|err| format!("{}", err))
+        .map(|err| err.to_string())
         .filter(|err| !err.is_empty())
         .enumerate()
         .map(|(i, err)| {
@@ -126,7 +126,7 @@ impl ErrorHints {
         if self.config_generate {
             eprintln!(
                 "Use '{}' to generate a new config file",
-                highlight(&format!("{} config generate", bin))
+                highlight(&format!("{bin} config generate"))
             );
         }
         if self.config {
@@ -138,7 +138,7 @@ impl ErrorHints {
         if self.config_test {
             eprintln!(
                 "Use '{}' to test a config file",
-                highlight(&format!("{} config test -c FILE", bin))
+                highlight(&format!("{bin} config test -c FILE"))
             );
         }
         if self.verbose {

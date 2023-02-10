@@ -11,7 +11,7 @@ fn player_uuid(username: &str) -> Uuid {
 
 /// Get UUID for given offline player username.
 pub fn offline_player_uuid(username: &str) -> Uuid {
-    player_uuid(&format!("{}{}", OFFLINE_PLAYER_NAMESPACE, username))
+    player_uuid(&format!("{OFFLINE_PLAYER_NAMESPACE}{username}"))
 }
 
 /// Java's `UUID.nameUUIDFromBytes`

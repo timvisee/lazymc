@@ -122,7 +122,7 @@ fn rewrite_contents(contents: String, mut changes: HashMap<&str, String>) -> Opt
             // Take any new value, and update it
             if let Some((_, new)) = changes.remove_entry(key.trim().to_lowercase().as_str()) {
                 if value != new {
-                    line = format!("{}={}", key, new);
+                    line = format!("{key}={new}");
                     changed = true;
                 }
             }
@@ -134,7 +134,7 @@ fn rewrite_contents(contents: String, mut changes: HashMap<&str, String>) -> Opt
 
     // Append any missed changes
     for (key, value) in changes {
-        new_contents += &format!("{}{}={}", EOL, key, value);
+        new_contents += &format!("{EOL}{key}={value}");
         changed = true;
     }
 

@@ -152,12 +152,8 @@ pub async fn serve(
                         info!(target: "lazymc", "Login from banned IP {}, disconnecting", client.peer.ip());
                         DEFAULT_BAN_REASON.to_string()
                     };
-                    action::kick(
-                        &client,
-                        &format!("{}{}", BAN_MESSAGE_PREFIX, msg),
-                        &mut writer,
-                    )
-                    .await?;
+                    action::kick(&client, &format!("{BAN_MESSAGE_PREFIX}{msg}"), &mut writer)
+                        .await?;
                     break;
                 }
             }
