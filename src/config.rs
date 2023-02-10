@@ -27,25 +27,16 @@ pub fn load(matches: &ArgMatches) -> Vec<Config> {
     let paths: Vec<PathBuf> = if path.is_dir() {
         path.read_dir()
             .unwrap()
-            .filter_map(|entry| {
-                entry.ok().and_then(|entry| {
-                    let path = entry.path();
-                    if path.is_file() {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect()
-    } else if path.is_file() {
-        vec![path.clone()]
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path()).collect()
     } else {
-        vec![]
+        vec![path.clone()]
     };
 
+    let configs: Vec<Config> = paths.into_iter().filter(|path| path.is_file()).map(load_file).collect();
+
     // Ensure configuration file/directory exists
-    if paths.is_empty() {
+    if configs.is_empty() {
         quit_error_msg(
             format!(
                 "Config file/directory does not exist: {}",
@@ -59,7 +50,7 @@ pub fn load(matches: &ArgMatches) -> Vec<Config> {
         );
     }
 
-    paths.into_iter().map(load_file).collect()
+    configs
 }
 
 /// Load config from file, based on CLI arguments.

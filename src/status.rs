@@ -108,115 +108,110 @@ pub async fn serve(
         }
 
         // Grab the server and config
-        if let Some(handshake) = client_info.handshake.as_ref() {
-            if let Some((config, server)) = servers.get(&handshake.server_addr) {
-                // Hijack server status packet
-                if client_state == ClientState::Status
-                    && packet.id == packets::status::SERVER_STATUS
-                {
-                    let server_status = server_status(&client_info, config, server).await;
-                    let packet = StatusResponse { server_status };
+        if let Some((config, server)) = client_info
+            .handshake
+            .as_ref()
+            .and_then(|handshake| servers.get(&handshake.server_addr))
+        {
+            // Hijack server status packet
+            if client_state == ClientState::Status && packet.id == packets::status::SERVER_STATUS {
+                let server_status = server_status(&client_info, config, server).await;
+                let packet = StatusResponse { server_status };
 
-                    let mut data = Vec::new();
-                    packet.encode(&mut data).map_err(|_| ())?;
+                let mut data = Vec::new();
+                packet.encode(&mut data).map_err(|_| ())?;
 
-                    let response = RawPacket::new(0, data).encode_with_len(&client)?;
-                    writer.write_all(&response).await.map_err(|_| ())?;
+                let response = RawPacket::new(0, data).encode_with_len(&client)?;
+                writer.write_all(&response).await.map_err(|_| ())?;
 
-                    continue;
+                continue;
+            }
+
+            // Hijack login start
+            if client_state == ClientState::Login && packet.id == packets::login::SERVER_LOGIN_START
+            {
+                // Try to get login username, update client info
+                // TODO: we should always parse this packet successfully
+                let username = LoginStart::decode(&mut packet.data.as_slice())
+                    .ok()
+                    .map(|p| p.name);
+                client_info.username = username.clone();
+
+                // Kick if lockout is enabled
+                if config.lockout.enabled {
+                    match username {
+                        Some(username) => {
+                            info!(target: "lazymc", "Kicked '{}' because lockout is enabled", username)
+                        }
+                        None => {
+                            info!(target: "lazymc", "Kicked player because lockout is enabled")
+                        }
+                    }
+                    action::kick(&client, &config.lockout.message, &mut writer).await?;
+                    break;
                 }
 
-                // Hijack login start
-                if client_state == ClientState::Login
-                    && packet.id == packets::login::SERVER_LOGIN_START
-                {
-                    // Try to get login username, update client info
-                    // TODO: we should always parse this packet successfully
-                    let username = LoginStart::decode(&mut packet.data.as_slice())
-                        .ok()
-                        .map(|p| p.name);
-                    client_info.username = username.clone();
-
-                    // Kick if lockout is enabled
-                    if config.lockout.enabled {
-                        match username {
-                            Some(username) => {
-                                info!(target: "lazymc", "Kicked '{}' because lockout is enabled", username)
-                            }
-                            None => {
-                                info!(target: "lazymc", "Kicked player because lockout is enabled")
-                            }
-                        }
-                        action::kick(&client, &config.lockout.message, &mut writer).await?;
+                // Kick if client is banned
+                if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
+                    if ban.is_banned() {
+                        let msg = if let Some(reason) = ban.reason {
+                            info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &reason);
+                            reason.to_string()
+                        } else {
+                            info!(target: "lazymc", "Login from banned IP {}, disconnecting", client.peer.ip());
+                            DEFAULT_BAN_REASON.to_string()
+                        };
+                        action::kick(&client, &format!("{BAN_MESSAGE_PREFIX}{msg}"), &mut writer)
+                            .await?;
                         break;
                     }
-
-                    // Kick if client is banned
-                    if let Some(ban) = server.ban_entry(&client.peer.ip()).await {
-                        if ban.is_banned() {
-                            let msg = if let Some(reason) = ban.reason {
-                                info!(target: "lazymc", "Login from banned IP {} ({}), disconnecting", client.peer.ip(), &reason);
-                                reason.to_string()
-                            } else {
-                                info!(target: "lazymc", "Login from banned IP {}, disconnecting", client.peer.ip());
-                                DEFAULT_BAN_REASON.to_string()
-                            };
-                            action::kick(
-                                &client,
-                                &format!("{BAN_MESSAGE_PREFIX}{msg}"),
-                                &mut writer,
-                            )
-                            .await?;
-                            break;
-                        }
-                    }
-
-                    // Kick if client is not whitelisted to wake server
-                    if let Some(ref username) = username {
-                        if !server.is_whitelisted(username).await {
-                            info!(target: "lazymc", "User '{}' tried to wake server but is not whitelisted, disconnecting", username);
-                            action::kick(&client, WHITELIST_MESSAGE, &mut writer).await?;
-                            break;
-                        }
-                    }
-
-                    // Start server if not starting yet
-                    Server::start(config.clone(), server.clone(), username).await;
-
-                    // Remember inbound packets
-                    inbound_history.extend(&raw);
-                    inbound_history.extend(&buf);
-
-                    // Build inbound packet queue with everything from login start (including this)
-                    let mut login_queue = BytesMut::with_capacity(raw.len() + buf.len());
-                    login_queue.extend(&raw);
-                    login_queue.extend(&buf);
-
-                    // Buf is fully consumed here
-                    buf.clear();
-
-                    // Route connection through proper channel
-                    if server.state() == server::State::Started {
-                        crate::service::server::route_proxy_queue(
-                            inbound,
-                            config.clone(),
-                            inbound_history.clone(),
-                        );
-                    } else {
-                        // Start occupying client
-                        join::occupy(
-                            client,
-                            client_info,
-                            config.clone(),
-                            server.clone(),
-                            inbound,
-                            inbound_history,
-                            login_queue,
-                        )
-                        .await?;
-                    }
-                    return Ok(());
                 }
+
+                // Kick if client is not whitelisted to wake server
+                if let Some(ref username) = username {
+                    if !server.is_whitelisted(username).await {
+                        info!(target: "lazymc", "User '{}' tried to wake server but is not whitelisted, disconnecting", username);
+                        action::kick(&client, WHITELIST_MESSAGE, &mut writer).await?;
+                        break;
+                    }
+                }
+
+                // Start server if not starting yet
+                Server::start(config.clone(), server.clone(), username).await;
+
+                // Remember inbound packets
+                inbound_history.extend(&raw);
+                inbound_history.extend(&buf);
+
+                // Build inbound packet queue with everything from login start (including this)
+                let mut login_queue = BytesMut::with_capacity(raw.len() + buf.len());
+                login_queue.extend(&raw);
+                login_queue.extend(&buf);
+
+                // Buf is fully consumed here
+                buf.clear();
+
+                // Route connection through proper channel
+                if server.state() == server::State::Started {
+                    crate::service::server::route_proxy_queue(
+                        inbound,
+                        config.clone(),
+                        inbound_history.clone(),
+                    );
+                } else {
+                    // Start occupying client
+                    join::occupy(
+                        client,
+                        client_info,
+                        config.clone(),
+                        server.clone(),
+                        inbound,
+                        inbound_history,
+                        login_queue,
+                    )
+                    .await?;
+                }
+                return Ok(());
             }
         }
 
