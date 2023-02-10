@@ -28,11 +28,11 @@ pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
         prepare_rcon(config);
 
         // Rewrite server server.properties file
-        rewrite_server_properties(&config);
+        rewrite_server_properties(config);
     }
 
     // Start server service
-    let configs_arc = configs.into_iter().map(|config| Arc::new(config)).collect();
+    let configs_arc = configs.into_iter().map(Arc::new).collect();
     service::server::service(bind_addr, configs_arc)
 }
 

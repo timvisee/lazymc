@@ -45,7 +45,7 @@ pub fn load(matches: &ArgMatches) -> Vec<Config> {
     };
 
     // Ensure configuration file/directory exists
-    if paths.len() == 0 {
+    if paths.is_empty() {
         quit_error_msg(
             format!(
                 "Config file/directory does not exist: {}",
@@ -59,7 +59,7 @@ pub fn load(matches: &ArgMatches) -> Vec<Config> {
         );
     }
 
-    paths.into_iter().map(|path| load_file(path)).collect()
+    paths.into_iter().map(load_file).collect()
 }
 
 /// Load config from file, based on CLI arguments.

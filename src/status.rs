@@ -114,7 +114,7 @@ pub async fn serve(
                 if client_state == ClientState::Status
                     && packet.id == packets::status::SERVER_STATUS
                 {
-                    let server_status = server_status(&client_info, &config, &server).await;
+                    let server_status = server_status(&client_info, config, server).await;
                     let packet = StatusResponse { server_status };
 
                     let mut data = Vec::new();
