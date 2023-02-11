@@ -9,6 +9,7 @@ use tokio::net::{TcpListener, TcpStream};
 use crate::config::Config;
 use crate::proto::client::Client;
 use crate::proxy::{self, ProxyHeader};
+use crate::router::Router;
 use crate::server::Server;
 use crate::service;
 use crate::status;
@@ -20,32 +21,19 @@ use crate::util::error::{quit_error, ErrorHints};
 ///
 /// Spawns a tokio runtime to complete all work on.
 #[tokio::main(flavor = "multi_thread")]
-pub async fn service(bind_addr: SocketAddr, configs: Vec<Arc<Config>>) -> Result<(), ()> {
-    // Listen for new connections
-    let listener = TcpListener::bind(bind_addr).await.map_err(|err| {
-        quit_error(
-            anyhow!(err).context("Failed to start proxy server"),
-            ErrorHints::default(),
-        );
-    })?;
+pub async fn service(configs: Vec<Config>) -> Result<(), ()> {
+    let mut routers: HashMap<SocketAddr, Router> = HashMap::new();
 
-    let mut servers = HashMap::new();
-
-    for config in configs.iter() {
+    for config in configs.into_iter() {
         // Load server state
-        let server = Arc::new(Server::default());
-        servers.insert(
-            config.public.address.clone(),
-            (config.clone(), server.clone()),
-        );
+        let server = Arc::new(Server::new(config));
+        routers
+            .entry(server.config.public.address)
+            .or_default()
+            .data
+            .insert(server.config.server.name.clone(), server.clone());
 
-        info!(
-            target: "lazymc",
-            "Proxying public {} to server {}",
-            config.public.address, config.server.address,
-        );
-
-        if config.lockout.enabled {
+        if server.config.lockout.enabled {
             warn!(
                 target: "lazymc",
                 "Lockout mode is enabled, nobody will be able to connect through the proxy",
@@ -53,27 +41,42 @@ pub async fn service(bind_addr: SocketAddr, configs: Vec<Arc<Config>>) -> Result
         }
 
         // Spawn services: monitor, signal handler
-        tokio::spawn(service::monitor::service(config.clone(), server.clone()));
-        tokio::spawn(service::signal::service(config.clone(), server.clone()));
+        tokio::spawn(service::monitor::service(server.clone()));
+        tokio::spawn(service::signal::service(server.clone()));
 
         // Initiate server start
-        if config.server.wake_on_start {
-            Server::start(config.clone(), server.clone(), None).await;
+        if server.config.server.wake_on_start {
+            Server::start(server.clone(), None).await;
         }
 
         // Spawn additional services: probe and ban manager
-        tokio::spawn(service::probe::service(config.clone(), server.clone()));
+        tokio::spawn(service::probe::service(server.clone()));
         tokio::task::spawn_blocking({
-            let (config, server) = (config.clone(), server.clone());
-            || service::file_watcher::service(config, server)
+            let server = server.clone();
+            || service::file_watcher::service(server)
         });
     }
 
-    let servers_arc = Arc::new(servers);
+    info!(target: "lazymc", "Routing\n{}", routers.iter().flat_map(|(public_address, router)| {
+        router.data.iter().map(move |(server_name, server)| {
+            format!("{} -> {} -> {}", server_name.clone().unwrap_or("*".to_string()), public_address, server.config.server.address.clone())
+        })
+    }).collect::<Vec<String>>().join("\n"));
 
-    // Route all incomming connections
-    while let Ok((inbound, _)) = listener.accept().await {
-        route(inbound, servers_arc.clone());
+    for (public_address, router) in routers {
+        let listener = TcpListener::bind(public_address).await.map_err(|err| {
+            quit_error(
+                anyhow!(err).context("Failed to start proxy server"),
+                ErrorHints::default(),
+            );
+        })?;
+
+        let router = Arc::new(router);
+
+        // Route all incomming connections
+        while let Ok((inbound, _)) = listener.accept().await {
+            route(inbound, router.clone());
+        }
     }
 
     Ok(())
@@ -81,7 +84,7 @@ pub async fn service(bind_addr: SocketAddr, configs: Vec<Arc<Config>>) -> Result
 
 /// Route inbound TCP stream to correct service, spawning a new task.
 #[inline]
-fn route(inbound: TcpStream, servers: Arc<HashMap<String, (Arc<Config>, Arc<Server>)>>) {
+fn route(inbound: TcpStream, router: Arc<Router>) {
     // Get user peer address
     let peer = match inbound.peer_addr() {
         Ok(peer) => peer,
@@ -92,7 +95,7 @@ fn route(inbound: TcpStream, servers: Arc<HashMap<String, (Arc<Config>, Arc<Serv
     };
 
     let client = Client::new(peer);
-    let service = status::serve(client, inbound, servers).map(|r| {
+    let service = status::serve(client, inbound, router).map(|r| {
         if let Err(err) = r {
             warn!(target: "lazymc", "Failed to serve status: {:?}", err);
         }
@@ -103,7 +106,7 @@ fn route(inbound: TcpStream, servers: Arc<HashMap<String, (Arc<Config>, Arc<Serv
 
 /// Route inbound TCP stream to proxy with queued data, spawning a new task.
 #[inline]
-pub fn route_proxy_queue(inbound: TcpStream, config: Arc<Config>, queue: BytesMut) {
+pub fn route_proxy_queue(inbound: TcpStream, config: &Config, queue: BytesMut) {
     route_proxy_address_queue(
         inbound,
         ProxyHeader::Proxy.not_none(config.server.send_proxy_v2),

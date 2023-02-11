@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
 
 use clap::ArgMatches;
 
@@ -15,9 +13,6 @@ const RCON_PASSWORD_LENGTH: usize = 32;
 
 /// Start lazymc.
 pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
-    // Parse bind address
-    let bind_addr: SocketAddr = matches.get_one::<String>("bind").unwrap().parse().unwrap();
-
     // Load config
     #[allow(unused_mut)]
     let mut configs = config::load(matches);
@@ -32,8 +27,7 @@ pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
     }
 
     // Start server service
-    let configs_arc = configs.into_iter().map(Arc::new).collect();
-    service::server::service(bind_addr, configs_arc)
+    service::server::service(configs)
 }
 
 /// Prepare RCON.

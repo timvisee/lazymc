@@ -155,8 +155,10 @@ impl Config {
 #[serde(default)]
 pub struct Public {
     /// Public address.
-    // #[serde(deserialize_with = "to_socket_addrs")]
-    pub address: String, // SocketAddr,
+    ///
+    /// The address lazymc will bind to and listen for incoming connections.
+    #[serde(deserialize_with = "to_socket_addrs")]
+    pub address: SocketAddr,
 
     /// Minecraft protocol version name hint.
     pub version: String,
@@ -186,6 +188,12 @@ pub struct Server {
 
     /// Start command.
     pub command: String,
+
+    /// Server Name.
+    ///
+    /// Incoming connections will be routed to this server according to the name in the handshake packet.
+    /// If no name is provided this server will act as a "catch-all" and be routed all connections where no other names match.
+    pub name: Option<String>,
 
     /// Server address.
     #[serde(

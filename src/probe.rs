@@ -11,7 +11,6 @@ use minecraft_protocol::version::v1_14_4::login::{
 use tokio::net::TcpStream;
 use tokio::time;
 
-use crate::config::Config;
 use crate::forge;
 use crate::net;
 use crate::proto::client::{Client, ClientInfo, ClientState};
@@ -35,11 +34,11 @@ const PROBE_ONLINE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const PROBE_JOIN_GAME_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Connect to the Minecraft server and probe useful details from it.
-pub async fn probe(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
+pub async fn probe(server: Arc<Server>) -> Result<(), ()> {
     debug!(target: "lazymc::probe", "Starting server probe...");
 
     // Start server if not starting already
-    if Server::start(config.clone(), server.clone(), None).await {
+    if Server::start(server.clone(), None).await {
         info!(target: "lazymc::probe", "Starting server to probe...");
     }
 
@@ -52,7 +51,7 @@ pub async fn probe(config: Arc<Config>, server: Arc<Server>) -> Result<(), ()> {
     debug!(target: "lazymc::probe", "Connecting to server to probe details...");
 
     // Connect to server, record Forge payload
-    let forge_payload = connect_to_server(&config, &server).await?;
+    let forge_payload = connect_to_server(&server).await?;
     *server.forge_payload.write().await = forge_payload;
 
     Ok(())
@@ -115,10 +114,10 @@ async fn wait_until_online<'a>(server: &Server) -> Result<bool, ()> {
 /// This will initialize the connection to the play state. Client details are used.
 ///
 /// Returns recorded Forge login payload if any.
-async fn connect_to_server(config: &Config, server: &Server) -> Result<Vec<Vec<u8>>, ()> {
+async fn connect_to_server(server: &Server) -> Result<Vec<Vec<u8>>, ()> {
     time::timeout(
         PROBE_CONNECT_TIMEOUT,
-        connect_to_server_no_timeout(config, server),
+        connect_to_server_no_timeout(server),
     )
     .await
     .map_err(|_| {
@@ -132,13 +131,10 @@ async fn connect_to_server(config: &Config, server: &Server) -> Result<Vec<Vec<u
 ///
 /// Returns recorded Forge login payload if any.
 // TODO: clean this up
-async fn connect_to_server_no_timeout(
-    config: &Config,
-    server: &Server,
-) -> Result<Vec<Vec<u8>>, ()> {
+async fn connect_to_server_no_timeout(server: &Server) -> Result<Vec<Vec<u8>>, ()> {
     // Open connection
     // TODO: on connect fail, ping server and redirect to serve_status if offline
-    let mut outbound = TcpStream::connect(config.server.address)
+    let mut outbound = TcpStream::connect(server.config.server.address)
         .await
         .map_err(|_| ())?;
 
@@ -151,23 +147,29 @@ async fn connect_to_server_no_timeout(
 
     // Construct client info
     let mut tmp_client_info = ClientInfo::empty();
-    tmp_client_info.protocol.replace(config.public.protocol);
+    tmp_client_info
+        .protocol
+        .replace(server.config.public.protocol);
 
     let (mut reader, mut writer) = outbound.split();
 
     // Select server address to use, add magic if Forge
-    let server_addr = if config.server.forge {
-        format!("{}{}", config.server.address.ip(), forge::STATUS_MAGIC)
+    let server_addr = if server.config.server.forge {
+        format!(
+            "{}{}",
+            server.config.server.address.ip(),
+            forge::STATUS_MAGIC
+        )
     } else {
-        config.server.address.ip().to_string()
+        server.config.server.address.ip().to_string()
     };
 
     // Send handshake packet
     packet::write_packet(
         Handshake {
-            protocol_version: config.public.protocol as i32,
+            protocol_version: server.config.public.protocol as i32,
             server_addr,
-            server_port: config.server.address.port(),
+            server_port: server.config.server.address.port(),
             next_state: ClientState::Login.to_id(),
         },
         &tmp_client,
@@ -235,7 +237,7 @@ async fn connect_to_server_no_timeout(
             })?;
 
             // Handle plugin requests for Forge
-            if config.server.forge {
+            if server.config.server.forge {
                 // Record Forge login payload
                 forge_payload.push(raw);
 

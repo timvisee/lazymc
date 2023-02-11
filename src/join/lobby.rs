@@ -14,7 +14,6 @@ use super::MethodResult;
 pub async fn occupy(
     client: &Client,
     client_info: ClientInfo,
-    config: Arc<Config>,
     server: Arc<Server>,
     inbound: TcpStream,
     inbound_queue: BytesMut,
@@ -22,13 +21,13 @@ pub async fn occupy(
     trace!(target: "lazymc", "Using lobby method to occupy joining client");
 
     // Must be ready to lobby
-    if must_still_probe(&config, &server).await {
+    if must_still_probe(&server.config, &server).await {
         warn!(target: "lazymc", "Client connected but lobby is not ready, using next join method, probing not completed");
         return Ok(MethodResult::Continue(inbound));
     }
 
     // Start lobby
-    lobby::serve(client, client_info, inbound, config, server, inbound_queue).await?;
+    lobby::serve(client, client_info, inbound, server, inbound_queue).await?;
 
     // TODO: do not consume client here, allow other join method on fail
 

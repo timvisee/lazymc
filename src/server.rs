@@ -36,6 +36,9 @@ const UNIX_EXIT_SIGTERM: i32 = 130;
 /// Shared server state.
 #[derive(Debug)]
 pub struct Server {
+    /// Server config.
+    pub config: Config,
+
     /// Server state.
     ///
     /// Matches `State`, utilzes AtomicU8 for better performance.
@@ -95,6 +98,30 @@ pub struct Server {
 }
 
 impl Server {
+    pub fn new(config: Config) -> Self {
+        let (state_watch_sender, state_watch_receiver) = watch::channel(State::Stopped);
+
+        Self {
+            config,
+            state: AtomicU8::new(State::Stopped.to_u8()),
+            state_watch_sender,
+            state_watch_receiver,
+            pid: Default::default(),
+            status: Default::default(),
+            last_active: Default::default(),
+            keep_online_until: Default::default(),
+            kill_at: Default::default(),
+            banned_ips: Default::default(),
+            whitelist: Default::default(),
+            #[cfg(feature = "rcon")]
+            rcon_lock: Semaphore::new(1),
+            #[cfg(feature = "rcon")]
+            rcon_last_stop: Default::default(),
+            probed_join_game: Default::default(),
+            forge_payload: Default::default(),
+        }
+    }
+
     /// Get current state.
     pub fn state(&self) -> State {
         State::from_u8(self.state.load(Ordering::Relaxed))
@@ -110,8 +137,8 @@ impl Server {
     /// This updates various other internal things depending on how the state changes.
     ///
     /// Returns false if the state didn't change, in which case nothing happens.
-    async fn update_state(&self, state: State, config: &Config) -> bool {
-        self.update_state_from(None, state, config).await
+    async fn update_state(&self, state: State) -> bool {
+        self.update_state_from(None, state).await
     }
 
     /// Set new state, from a current state.
@@ -119,7 +146,7 @@ impl Server {
     /// This updates various other internal things depending on how the state changes.
     ///
     /// Returns false if current state didn't match `from` or if nothing changed.
-    async fn update_state_from(&self, from: Option<State>, new: State, config: &Config) -> bool {
+    async fn update_state_from(&self, from: Option<State>, new: State) -> bool {
         // Atomically swap state to new, return if from doesn't match
         let old = State::from_u8(match from {
             Some(from) => match self.state.compare_exchange(
@@ -146,11 +173,11 @@ impl Server {
 
         // Update kill at time for starting/stopping state
         *self.kill_at.write().await = match new {
-            State::Starting if config.server.start_timeout > 0 => {
-                Some(Instant::now() + Duration::from_secs(config.server.start_timeout as u64))
+            State::Starting if self.config.server.start_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(self.config.server.start_timeout as u64))
             }
-            State::Stopping if config.server.stop_timeout > 0 => {
-                Some(Instant::now() + Duration::from_secs(config.server.stop_timeout as u64))
+            State::Stopping if self.config.server.stop_timeout > 0 => {
+                Some(Instant::now() + Duration::from_secs(self.config.server.stop_timeout as u64))
             }
             _ => None,
         };
@@ -165,7 +192,7 @@ impl Server {
         // If Starting -> Started, update active time and keep it online for configured time
         if old == State::Starting && new == State::Started {
             self.update_last_active().await;
-            self.keep_online_for(Some(config.time.min_online_time))
+            self.keep_online_for(Some(self.config.time.min_online_time))
                 .await;
         }
 
@@ -176,14 +203,14 @@ impl Server {
     ///
     /// This updates various other internal things depending on the current state and the given
     /// status.
-    pub async fn update_status(&self, config: &Config, status: Option<ServerStatus>) {
+    pub async fn update_status(&self, status: Option<ServerStatus>) {
         // Update state based on curren
         match (self.state(), &status) {
             (State::Stopped | State::Starting, Some(_)) => {
-                self.update_state(State::Started, config).await;
+                self.update_state(State::Started).await;
             }
             (State::Started, None) => {
-                self.update_state(State::Stopped, config).await;
+                self.update_state(State::Stopped).await;
             }
             _ => {}
         }
@@ -202,10 +229,10 @@ impl Server {
     /// Try to start the server.
     ///
     /// Does nothing if currently not in stopped state.
-    pub async fn start(config: Arc<Config>, server: Arc<Server>, username: Option<String>) -> bool {
+    pub async fn start(server: Arc<Server>, username: Option<String>) -> bool {
         // Must set state from stopped to starting
         if !server
-            .update_state_from(Some(State::Stopped), State::Starting, &config)
+            .update_state_from(Some(State::Stopped), State::Starting)
             .await
         {
             return false;
@@ -219,42 +246,42 @@ impl Server {
 
         // Unfreeze server if it is frozen
         #[cfg(unix)]
-        if config.server.freeze_process && unfreeze_server_signal(&config, &server).await {
+        if server.config.server.freeze_process && unfreeze_server_signal(&server).await {
             return true;
         }
 
         // Spawn server in new task
-        Self::spawn_server_task(config, server);
+        Self::spawn_server_task(server);
         true
     }
 
     /// Spawn the server task.
     ///
     /// This should not be called directly.
-    fn spawn_server_task(config: Arc<Config>, server: Arc<Server>) {
-        tokio::spawn(invoke_server_cmd(config, server).map(|_| ()));
+    fn spawn_server_task(server: Arc<Server>) {
+        tokio::spawn(invoke_server_cmd(server).map(|_| ()));
     }
 
     /// Stop running server.
     ///
     /// This will attempt to stop the server with all available methods.
     #[allow(unused_variables)]
-    pub async fn stop(&self, config: &Config) -> bool {
+    pub async fn stop(&self) -> bool {
         // Try to freeze through signal
         #[cfg(unix)]
-        if config.server.freeze_process && freeze_server_signal(config, self).await {
+        if self.config.server.freeze_process && freeze_server_signal(self).await {
             return true;
         }
 
         // Try to stop through RCON if started
         #[cfg(feature = "rcon")]
-        if self.state() == State::Started && stop_server_rcon(config, self).await {
+        if self.state() == State::Started && stop_server_rcon(&self.config, self).await {
             return true;
         }
 
         // Try to stop through signal
         #[cfg(unix)]
-        if stop_server_signal(config, self).await {
+        if stop_server_signal(self).await {
             return true;
         }
 
@@ -394,31 +421,6 @@ impl Server {
     }
 }
 
-impl Default for Server {
-    fn default() -> Self {
-        let (state_watch_sender, state_watch_receiver) = watch::channel(State::Stopped);
-
-        Self {
-            state: AtomicU8::new(State::Stopped.to_u8()),
-            state_watch_sender,
-            state_watch_receiver,
-            pid: Default::default(),
-            status: Default::default(),
-            last_active: Default::default(),
-            keep_online_until: Default::default(),
-            kill_at: Default::default(),
-            banned_ips: Default::default(),
-            whitelist: Default::default(),
-            #[cfg(feature = "rcon")]
-            rcon_lock: Semaphore::new(1),
-            #[cfg(feature = "rcon")]
-            rcon_last_stop: Default::default(),
-            probed_join_game: Default::default(),
-            forge_payload: Default::default(),
-        }
-    }
-}
-
 /// Server state.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum State {
@@ -459,18 +461,15 @@ impl State {
 }
 
 /// Invoke server command, store PID and wait for it to quit.
-pub async fn invoke_server_cmd(
-    config: Arc<Config>,
-    state: Arc<Server>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn invoke_server_cmd(server: Arc<Server>) -> Result<(), Box<dyn std::error::Error>> {
     // Configure command
-    let args = shlex::split(&config.server.command).expect("invalid server command");
+    let args = shlex::split(&server.config.server.command).expect("invalid server command");
     let mut cmd = Command::new(&args[0]);
     cmd.args(args.iter().skip(1));
     cmd.kill_on_drop(true);
 
     // Set working directory
-    if let Some(ref dir) = ConfigServer::server_directory(&config) {
+    if let Some(ref dir) = ConfigServer::server_directory(&server.config) {
         cmd.current_dir(dir);
     }
 
@@ -484,7 +483,7 @@ pub async fn invoke_server_cmd(
     };
 
     // Remember PID
-    state
+    server
         .pid
         .lock()
         .await
@@ -503,7 +502,7 @@ pub async fn invoke_server_cmd(
         }
         Ok(status) => {
             warn!(target: "lazymc", "Server process stopped with error code ({})", status);
-            state.state() == State::Started
+            server.state() == State::Started
         }
         Err(err) => {
             error!(target: "lazymc", "Failed to wait for server process to quit: {}", err);
@@ -513,18 +512,18 @@ pub async fn invoke_server_cmd(
     };
 
     // Forget server PID
-    state.pid.lock().await.take();
+    server.pid.lock().await.take();
 
     // Give server a little more time to quit forgotten threads
     time::sleep(SERVER_QUIT_COOLDOWN).await;
 
     // Set server state to stopped
-    state.update_state(State::Stopped, &config).await;
+    server.update_state(State::Stopped).await;
 
     // Restart on crash
-    if crashed && config.server.wake_on_crash {
+    if crashed && server.config.server.wake_on_crash {
         warn!(target: "lazymc", "Server crashed, restarting...");
-        Server::start(config, state, None).await;
+        Server::start(server, None).await;
     }
 
     Ok(())
@@ -573,7 +572,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
 
     // Set server to stopping state, update last RCON time
     server.rcon_last_stop.lock().await.replace(Instant::now());
-    server.update_state(State::Stopping, config).await;
+    server.update_state(State::Stopping).await;
 
     // Gracefully close connection
     rcon.close().await;
@@ -587,7 +586,7 @@ async fn stop_server_rcon(config: &Config, server: &Server) -> bool {
 ///
 /// Only available on Unix.
 #[cfg(unix)]
-async fn stop_server_signal(config: &Config, server: &Server) -> bool {
+async fn stop_server_signal(server: &Server) -> bool {
     // Grab PID
     let pid = match *server.pid.lock().await {
         Some(pid) => pid,
@@ -603,10 +602,10 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
     }
 
     server
-        .update_state_from(Some(State::Starting), State::Stopping, config)
+        .update_state_from(Some(State::Starting), State::Stopping)
         .await;
     server
-        .update_state_from(Some(State::Started), State::Stopping, config)
+        .update_state_from(Some(State::Started), State::Stopping)
         .await;
 
     true
@@ -616,7 +615,7 @@ async fn stop_server_signal(config: &Config, server: &Server) -> bool {
 ///
 /// Only available on Unix.
 #[cfg(unix)]
-async fn freeze_server_signal(config: &Config, server: &Server) -> bool {
+async fn freeze_server_signal(server: &Server) -> bool {
     // Grab PID
     let pid = match *server.pid.lock().await {
         Some(pid) => pid,
@@ -631,10 +630,10 @@ async fn freeze_server_signal(config: &Config, server: &Server) -> bool {
     }
 
     server
-        .update_state_from(Some(State::Starting), State::Stopped, config)
+        .update_state_from(Some(State::Starting), State::Stopped)
         .await;
     server
-        .update_state_from(Some(State::Started), State::Stopped, config)
+        .update_state_from(Some(State::Started), State::Stopped)
         .await;
 
     true
@@ -644,7 +643,7 @@ async fn freeze_server_signal(config: &Config, server: &Server) -> bool {
 ///
 /// Only available on Unix.
 #[cfg(unix)]
-async fn unfreeze_server_signal(config: &Config, server: &Server) -> bool {
+async fn unfreeze_server_signal(server: &Server) -> bool {
     // Grab PID
     let pid = match *server.pid.lock().await {
         Some(pid) => pid,
@@ -659,10 +658,10 @@ async fn unfreeze_server_signal(config: &Config, server: &Server) -> bool {
     }
 
     server
-        .update_state_from(Some(State::Stopping), State::Starting, config)
+        .update_state_from(Some(State::Stopping), State::Starting)
         .await;
     server
-        .update_state_from(Some(State::Stopped), State::Starting, config)
+        .update_state_from(Some(State::Stopped), State::Starting)
         .await;
 
     true

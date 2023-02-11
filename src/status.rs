@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytes::BytesMut;
@@ -20,7 +19,9 @@ use crate::proto::action;
 use crate::proto::client::{Client, ClientInfo, ClientState};
 use crate::proto::packet::{self, RawPacket};
 use crate::proto::packets;
-use crate::server::{self, Server};
+use crate::router::Router;
+use crate::server::{self, Server, State};
+use crate::service::server::route_proxy_queue;
 
 /// The ban message prefix.
 const BAN_MESSAGE_PREFIX: &str = "Your IP address is banned from this server.\nReason: ";
@@ -36,11 +37,7 @@ const SERVER_ICON_FILE: &str = "server-icon.png";
 
 /// Proxy the given inbound stream to a target address.
 // TODO: do not drop error here, return Box<dyn Error>
-pub async fn serve(
-    client: Client,
-    mut inbound: TcpStream,
-    servers: Arc<HashMap<String, (Arc<Config>, Arc<Server>)>>,
-) -> Result<(), ()> {
+pub async fn serve(client: Client, mut inbound: TcpStream, router: Arc<Router>) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
     // Incoming buffer and packet holding queue
@@ -51,6 +48,19 @@ pub async fn serve(
     let mut client_info = ClientInfo::empty();
 
     loop {
+        let server = client_info
+            .handshake
+            .as_ref()
+            .and_then(|handshake| router.get(handshake.server_addr.clone()));
+
+        if let Some(server) = server
+            .clone()
+            .filter(|server| server.state() == State::Started)
+        {
+            route_proxy_queue(inbound, &server.config, inbound_history);
+            return Ok(());
+        }
+
         // Read packet from stream
         let (packet, raw) = match packet::read_packet(&client, &mut buf, &mut reader).await {
             Ok(Some(packet)) => packet,
@@ -107,15 +117,10 @@ pub async fn serve(
             continue;
         }
 
-        // Grab the server and config
-        if let Some((config, server)) = client_info
-            .handshake
-            .as_ref()
-            .and_then(|handshake| servers.get(&handshake.server_addr))
-        {
+        if let Some(server) = server {
             // Hijack server status packet
             if client_state == ClientState::Status && packet.id == packets::status::SERVER_STATUS {
-                let server_status = server_status(&client_info, config, server).await;
+                let server_status = server_status(&client_info, &server).await;
                 let packet = StatusResponse { server_status };
 
                 let mut data = Vec::new();
@@ -138,7 +143,7 @@ pub async fn serve(
                 client_info.username = username.clone();
 
                 // Kick if lockout is enabled
-                if config.lockout.enabled {
+                if server.config.lockout.enabled {
                     match username {
                         Some(username) => {
                             info!(target: "lazymc", "Kicked '{}' because lockout is enabled", username)
@@ -147,7 +152,7 @@ pub async fn serve(
                             info!(target: "lazymc", "Kicked player because lockout is enabled")
                         }
                     }
-                    action::kick(&client, &config.lockout.message, &mut writer).await?;
+                    action::kick(&client, &server.config.lockout.message, &mut writer).await?;
                     break;
                 }
 
@@ -177,7 +182,7 @@ pub async fn serve(
                 }
 
                 // Start server if not starting yet
-                Server::start(config.clone(), server.clone(), username).await;
+                Server::start(server.clone(), username).await;
 
                 // Remember inbound packets
                 inbound_history.extend(&raw);
@@ -191,26 +196,16 @@ pub async fn serve(
                 // Buf is fully consumed here
                 buf.clear();
 
-                // Route connection through proper channel
-                if server.state() == server::State::Started {
-                    crate::service::server::route_proxy_queue(
-                        inbound,
-                        config.clone(),
-                        inbound_history.clone(),
-                    );
-                } else {
-                    // Start occupying client
-                    join::occupy(
-                        client,
-                        client_info,
-                        config.clone(),
-                        server.clone(),
-                        inbound,
-                        inbound_history,
-                        login_queue,
-                    )
-                    .await?;
-                }
+                // Start occupying client
+                join::occupy(
+                    client,
+                    client_info,
+                    server.clone(),
+                    inbound,
+                    inbound_history,
+                    login_queue,
+                )
+                .await?;
                 return Ok(());
             }
         }
@@ -225,7 +220,7 @@ pub async fn serve(
 }
 
 /// Build server status object to respond to client with.
-async fn server_status(client_info: &ClientInfo, config: &Config, server: &Server) -> ServerStatus {
+async fn server_status(client_info: &ClientInfo, server: &Server) -> ServerStatus {
     let status = server.status().await;
     let server_state = server.state();
 
@@ -239,8 +234,8 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
         Some(status) => (status.version.clone(), status.players.max),
         None => (
             ServerVersion {
-                name: config.public.version.clone(),
-                protocol: config.public.protocol,
+                name: server.config.public.version.clone(),
+                protocol: server.config.public.protocol,
             },
             0,
         ),
@@ -248,13 +243,13 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
 
     // Select description, use server MOTD if enabled, or use configured
     let description = {
-        if config.motd.from_server && status.is_some() {
+        if server.config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
             Message::new(Payload::text(match server_state {
-                server::State::Stopped | server::State::Started => &config.motd.sleeping,
-                server::State::Starting => &config.motd.starting,
-                server::State::Stopping => &config.motd.stopping,
+                server::State::Stopped | server::State::Started => &server.config.motd.sleeping,
+                server::State::Starting => &server.config.motd.starting,
+                server::State::Stopping => &server.config.motd.stopping,
             }))
         }
     };
@@ -262,11 +257,11 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
     // Extract favicon from real server status, load from disk, or use default
     let mut favicon = None;
     if favicon::supports_favicon(client_info) {
-        if config.motd.from_server && status.is_some() {
+        if server.config.motd.from_server && status.is_some() {
             favicon = status.as_ref().unwrap().favicon.clone()
         }
         if favicon.is_none() {
-            favicon = Some(server_favicon(config).await);
+            favicon = Some(server_favicon(&server.config).await);
         }
     }
 
