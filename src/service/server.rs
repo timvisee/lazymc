@@ -84,7 +84,7 @@ fn route(inbound: TcpStream, config: Arc<Config>, server: Arc<Server>) {
 
     // Check ban state, just drop connection if enabled
     let banned = server.is_banned_ip_blocking(&peer.ip());
-    if config.server.drop_banned_ips {
+    if banned && config.server.drop_banned_ips {
         info!(target: "lazymc", "Connection from banned IP {}, dropping", peer.ip());
         return;
     }
