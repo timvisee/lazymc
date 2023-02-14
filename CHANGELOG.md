@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.9 (2023-02-14)
+
+- Fix dropping all connections when `server.drop_banned_ips` was enabled
+- Update dependencies
+
 ## 0.2.8 (2023-01-30)
 
 - Add `freeze_process` feature on Unix platforms to freeze a sleeping server

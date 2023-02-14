@@ -187,4 +187,4 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 [config]
 # lazymc version this configuration is for.
 # Don't change unless you know what you're doing.
-version = "0.2.8"
+version = "0.2.9"
