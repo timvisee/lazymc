@@ -75,10 +75,7 @@ pub async fn monitor_server(server: Arc<Server>) {
 ///
 /// Returns `Ok` if status/ping succeeded, includes server status most of the time.
 /// Returns `Err` if no connection could be established or if an error occurred.
-pub async fn poll_server(
-    server: &Server,
-    addr: SocketAddr,
-) -> Result<Option<ServerStatus>, ()> {
+pub async fn poll_server(server: &Server, addr: SocketAddr) -> Result<Option<ServerStatus>, ()> {
     // Fetch status
     if let Ok(status) = fetch_status(&server.config, addr).await {
         return Ok(Some(status));

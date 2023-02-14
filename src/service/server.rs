@@ -4,13 +4,16 @@ use std::sync::Arc;
 
 use bytes::BytesMut;
 use futures::FutureExt;
+use minecraft_protocol::decoder::Decoder;
+use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::config::Config;
-use crate::proto::client::Client;
+use crate::proto::client::{Client, ClientInfo, ClientState};
+use crate::proto::{packet, packets};
 use crate::proxy::{self, ProxyHeader};
 use crate::router::Router;
-use crate::server::Server;
+use crate::server::{self, Server};
 use crate::service;
 use crate::status;
 use crate::util::error::{quit_error, ErrorHints};
@@ -75,7 +78,7 @@ pub async fn service(configs: Vec<Config>) -> Result<(), ()> {
 
         // Route all incomming connections
         while let Ok((inbound, _)) = listener.accept().await {
-            route(inbound, router.clone());
+            route(inbound, router.clone()).await;
         }
     }
 
@@ -84,7 +87,7 @@ pub async fn service(configs: Vec<Config>) -> Result<(), ()> {
 
 /// Route inbound TCP stream to correct service, spawning a new task.
 #[inline]
-fn route(inbound: TcpStream, router: Arc<Router>) {
+async fn route(mut inbound: TcpStream, router: Arc<Router>) {
     // Get user peer address
     let peer = match inbound.peer_addr() {
         Ok(peer) => peer,
@@ -95,7 +98,92 @@ fn route(inbound: TcpStream, router: Arc<Router>) {
     };
 
     let client = Client::new(peer);
-    let service = status::serve(client, inbound, router).map(|r| {
+
+    let (mut reader, _) = inbound.split();
+
+    // Incoming buffer and packet holding queue
+    let mut buf = BytesMut::new();
+
+    // Remember inbound packets, track client info
+    let mut inbound_history = BytesMut::new();
+    let mut client_info = ClientInfo::empty();
+
+    // Read packet from stream
+    let (packet, raw) = match packet::read_packet(&client, &mut buf, &mut reader).await {
+        Ok(Some(packet)) => packet,
+        Ok(None) => return,
+        Err(_) => {
+            error!(target: "lazymc", "Closing connection, error occurred");
+            return;
+        }
+    };
+
+    // Hijack handshake
+    if client.state() == ClientState::Handshake && packet.id == packets::handshake::SERVER_HANDSHAKE
+    {
+        // Parse handshake
+        let handshake = match Handshake::decode(&mut packet.data.as_slice()) {
+            Ok(handshake) => handshake,
+            Err(_) => {
+                debug!(target: "lazymc", "Got malformed handshake from client, disconnecting");
+                return;
+            }
+        };
+
+        let server = match router.get(handshake.server_addr.clone()) {
+            Some(server) => server,
+            None => {
+                error!(target: "lazymc", "Client tried to join a non existing server ({})", handshake.server_addr);
+                return;
+            }
+        };
+
+        // Check ban state, just drop connection if enabled
+        let banned = server.is_banned_ip_blocking(&peer.ip());
+        if server.config.server.drop_banned_ips {
+            info!(target: "lazymc", "Connection from banned IP {}, dropping", peer.ip());
+            return;
+        }
+
+        // Parse new state
+        let new_state = match ClientState::from_id(handshake.next_state) {
+            Some(state) => state,
+            None => {
+                error!(target: "lazymc", "Client tried to switch into unknown protcol state ({}), disconnecting", handshake.next_state);
+                return;
+            }
+        };
+
+        // Update client info and client state
+        client_info
+            .protocol
+            .replace(handshake.protocol_version as u32);
+        client_info.handshake.replace(handshake);
+        client.set_state(new_state);
+        inbound_history.extend(raw);
+
+        // Route connection through proper channel
+        let should_proxy =
+            !banned && server.state() == server::State::Started && !server.config.lockout.enabled;
+        if should_proxy {
+            route_proxy_queue(inbound, &server.config, inbound_history)
+        } else {
+            route_status(client, inbound, server, inbound_history, client_info)
+        }
+    }
+}
+
+/// Route inbound TCP stream to status server, spawning a new task.
+#[inline]
+fn route_status(
+    client: Client,
+    inbound: TcpStream,
+    server: Arc<Server>,
+    inbound_history: BytesMut,
+    client_info: ClientInfo,
+) {
+    // When server is not online, spawn a status server
+    let service = status::serve(client, inbound, server, inbound_history, client_info).map(|r| {
         if let Err(err) = r {
             warn!(target: "lazymc", "Failed to serve status: {:?}", err);
         }
