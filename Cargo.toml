@@ -1,6 +1,6 @@
 [package]
 name = "lazymc"
-version = "0.2.8"
+version = "0.2.9"
 authors = ["Tim Visee <3a4fb3964f@sinenomine.email>"]
 license = "GPL-3.0"
 readme = "README.md"
