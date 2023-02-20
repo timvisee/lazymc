@@ -29,9 +29,11 @@ const SERVER_QUIT_COOLDOWN: Duration = Duration::from_millis(2500);
 #[cfg(feature = "rcon")]
 const RCON_COOLDOWN: Duration = Duration::from_secs(15);
 
-/// Exit code when SIGTERM is received on Unix.
-#[cfg(unix)]
-const UNIX_EXIT_SIGTERM: i32 = 130;
+/// Exit codes that are allowed.
+///
+/// - 143: https://github.com/timvisee/lazymc/issues/26#issuecomment-1435670029
+/// - 130: https://unix.stackexchange.com/q/386836/61092
+const ALLOWED_EXIT_CODES: [i32; 2] = [130, 143];
 
 /// Shared server state.
 #[derive(Debug)]
@@ -496,8 +498,12 @@ pub async fn invoke_server_cmd(
             debug!(target: "lazymc", "Server process stopped successfully ({})", status);
             false
         }
-        #[cfg(unix)]
-        Ok(status) if status.code() == Some(UNIX_EXIT_SIGTERM) => {
+        Ok(status)
+            if status
+                .code()
+                .map(|ref code| ALLOWED_EXIT_CODES.contains(code))
+                .unwrap_or(false) =>
+        {
             debug!(target: "lazymc", "Server process stopped successfully by SIGTERM ({})", status);
             false
         }
