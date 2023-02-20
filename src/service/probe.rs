@@ -5,14 +5,14 @@ use crate::probe;
 use crate::server::Server;
 
 /// Probe server.
-pub async fn service(config: Arc<Config>, state: Arc<Server>) {
+pub async fn service(server: Arc<Server>) {
     // Only probe if enabled or if we must
-    if !config.server.probe_on_start && !must_probe(&config) {
+    if !server.config.server.probe_on_start && !must_probe(&server.config) {
         return;
     }
 
     // Probe
-    match probe::probe(config, state).await {
+    match probe::probe(server).await {
         Ok(_) => info!(target: "lazymc::probe", "Succesfully probed server"),
         Err(_) => {
             error!(target: "lazymc::probe", "Failed to probe server, this may limit lazymc features")

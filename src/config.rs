@@ -17,21 +17,34 @@ pub const CONFIG_FILE: &str = "lazymc.toml";
 /// Configuration version user should be using, or warning will be shown.
 const CONFIG_VERSION: &str = "0.2.8";
 
-/// Load config from file, based on CLI arguments.
-///
-/// Quits with an error message on failure.
-pub fn load(matches: &ArgMatches) -> Config {
+pub fn load(matches: &ArgMatches) -> Vec<Config> {
     // Get config path, attempt to canonicalize
     let mut path = PathBuf::from(matches.get_one::<String>("config").unwrap());
     if let Ok(p) = path.canonicalize() {
         path = p;
     }
 
-    // Ensure configuration file exists
-    if !path.is_file() {
+    let paths: Vec<PathBuf> = if path.is_dir() {
+        path.read_dir()
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .collect()
+    } else {
+        vec![path.clone()]
+    };
+
+    let configs: Vec<Config> = paths
+        .into_iter()
+        .filter(|path| path.is_file())
+        .map(load_file)
+        .collect();
+
+    // Ensure configuration file/directory exists
+    if configs.is_empty() {
         quit_error_msg(
             format!(
-                "Config file does not exist: {}",
+                "Config file/directory does not exist: {}",
                 path.to_str().unwrap_or("?")
             ),
             ErrorHintsBuilder::default()
@@ -42,6 +55,13 @@ pub fn load(matches: &ArgMatches) -> Config {
         );
     }
 
+    configs
+}
+
+/// Load config from file, based on CLI arguments.
+///
+/// Quits with an error message on failure.
+pub fn load_file(path: PathBuf) -> Config {
     // Load config
     let config = match Config::load(path) {
         Ok(config) => config,
@@ -135,6 +155,8 @@ impl Config {
 #[serde(default)]
 pub struct Public {
     /// Public address.
+    ///
+    /// The address lazymc will bind to and listen for incoming connections.
     #[serde(deserialize_with = "to_socket_addrs")]
     pub address: SocketAddr,
 
@@ -166,6 +188,12 @@ pub struct Server {
 
     /// Start command.
     pub command: String,
+
+    /// Server Name.
+    ///
+    /// Incoming connections will be routed to this server according to the name in the handshake packet.
+    /// If no name is provided this server will act as a "catch-all" and be routed all connections where no other names match.
+    pub name: Option<String>,
 
     /// Server address.
     #[serde(

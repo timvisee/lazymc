@@ -11,15 +11,6 @@ use tokio::net::TcpStream;
 use crate::net;
 
 /// Proxy the inbound stream to a target address.
-pub async fn proxy(
-    inbound: TcpStream,
-    proxy_header: ProxyHeader,
-    addr_target: SocketAddr,
-) -> Result<(), Box<dyn Error>> {
-    proxy_with_queue(inbound, proxy_header, addr_target, &[]).await
-}
-
-/// Proxy the inbound stream to a target address.
 ///
 /// Send the queue to the target server before proxying.
 pub async fn proxy_with_queue(

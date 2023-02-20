@@ -29,7 +29,6 @@ pub enum MethodResult {
 pub async fn occupy(
     client: Client,
     #[allow(unused_variables)] client_info: ClientInfo,
-    config: Arc<Config>,
     server: Arc<Server>,
     mut inbound: TcpStream,
     mut inbound_history: BytesMut,
@@ -43,26 +42,18 @@ pub async fn occupy(
     );
 
     // Go through all configured join methods
-    for method in &config.join.methods {
+    for method in &server.config.join.methods {
         // Invoke method, take result
         let result = match method {
             // Kick method, immediately kick client
-            Method::Kick => kick::occupy(&client, &config, &server, inbound).await?,
+            Method::Kick => kick::occupy(&client, &server, inbound).await?,
 
             // Hold method, hold client connection while server starts
-            Method::Hold => {
-                hold::occupy(
-                    config.clone(),
-                    server.clone(),
-                    inbound,
-                    &mut inbound_history,
-                )
-                .await?
-            }
+            Method::Hold => hold::occupy(server.clone(), inbound, &mut inbound_history).await?,
 
             // Forward method, forward client connection while server starts
             Method::Forward => {
-                forward::occupy(config.clone(), inbound, &mut inbound_history).await?
+                forward::occupy(&server.config, inbound, &mut inbound_history).await?
             }
 
             // Lobby method, keep client in lobby while server starts
@@ -71,7 +62,6 @@ pub async fn occupy(
                 lobby::occupy(
                     &client,
                     client_info.clone(),
-                    config.clone(),
                     server.clone(),
                     inbound,
                     login_queue.clone(),

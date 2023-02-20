@@ -5,7 +5,6 @@ use minecraft_protocol::data::chat::{Message, Payload};
 use minecraft_protocol::data::server_status::*;
 use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
-use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::LoginStart;
 use minecraft_protocol::version::v1_14_4::status::StatusResponse;
 use tokio::fs;
@@ -38,17 +37,14 @@ const SERVER_ICON_FILE: &str = "server-icon.png";
 pub async fn serve(
     client: Client,
     mut inbound: TcpStream,
-    config: Arc<Config>,
     server: Arc<Server>,
+    mut inbound_history: BytesMut,
+    mut client_info: ClientInfo,
 ) -> Result<(), ()> {
     let (mut reader, mut writer) = inbound.split();
 
     // Incoming buffer and packet holding queue
     let mut buf = BytesMut::new();
-
-    // Remember inbound packets, track client info
-    let mut inbound_history = BytesMut::new();
-    let mut client_info = ClientInfo::empty();
 
     loop {
         // Read packet from stream
@@ -64,46 +60,15 @@ pub async fn serve(
         // Grab client state
         let client_state = client.state();
 
-        // Hijack handshake
-        if client_state == ClientState::Handshake
-            && packet.id == packets::handshake::SERVER_HANDSHAKE
-        {
-            // Parse handshake
-            let handshake = match Handshake::decode(&mut packet.data.as_slice()) {
-                Ok(handshake) => handshake,
-                Err(_) => {
-                    debug!(target: "lazymc", "Got malformed handshake from client, disconnecting");
-                    break;
-                }
-            };
-
-            // Parse new state
-            let new_state = match ClientState::from_id(handshake.next_state) {
-                Some(state) => state,
-                None => {
-                    error!(target: "lazymc", "Client tried to switch into unknown protcol state ({}), disconnecting", handshake.next_state);
-                    break;
-                }
-            };
-
-            // Update client info and client state
-            client_info
-                .protocol
-                .replace(handshake.protocol_version as u32);
-            client_info.handshake.replace(handshake);
-            client.set_state(new_state);
-
-            // If loggin in with handshake, remember inbound
-            if new_state == ClientState::Login {
-                inbound_history.extend(raw);
-            }
-
+        // Hijack ping packet
+        if client_state == ClientState::Status && packet.id == packets::status::SERVER_PING {
+            writer.write_all(&raw).await.map_err(|_| ())?;
             continue;
         }
 
         // Hijack server status packet
         if client_state == ClientState::Status && packet.id == packets::status::SERVER_STATUS {
-            let server_status = server_status(&client_info, &config, &server).await;
+            let server_status = server_status(&client_info, &server).await;
             let packet = StatusResponse { server_status };
 
             let mut data = Vec::new();
@@ -112,12 +77,6 @@ pub async fn serve(
             let response = RawPacket::new(0, data).encode_with_len(&client)?;
             writer.write_all(&response).await.map_err(|_| ())?;
 
-            continue;
-        }
-
-        // Hijack ping packet
-        if client_state == ClientState::Status && packet.id == packets::status::SERVER_PING {
-            writer.write_all(&raw).await.map_err(|_| ())?;
             continue;
         }
 
@@ -131,14 +90,16 @@ pub async fn serve(
             client_info.username = username.clone();
 
             // Kick if lockout is enabled
-            if config.lockout.enabled {
+            if server.config.lockout.enabled {
                 match username {
                     Some(username) => {
                         info!(target: "lazymc", "Kicked '{}' because lockout is enabled", username)
                     }
-                    None => info!(target: "lazymc", "Kicked player because lockout is enabled"),
+                    None => {
+                        info!(target: "lazymc", "Kicked player because lockout is enabled")
+                    }
                 }
-                action::kick(&client, &config.lockout.message, &mut writer).await?;
+                action::kick(&client, &server.config.lockout.message, &mut writer).await?;
                 break;
             }
 
@@ -168,7 +129,7 @@ pub async fn serve(
             }
 
             // Start server if not starting yet
-            Server::start(config.clone(), server.clone(), username).await;
+            Server::start(server.clone(), username).await;
 
             // Remember inbound packets
             inbound_history.extend(&raw);
@@ -186,8 +147,7 @@ pub async fn serve(
             join::occupy(
                 client,
                 client_info,
-                config,
-                server,
+                server.clone(),
                 inbound,
                 inbound_history,
                 login_queue,
@@ -206,7 +166,7 @@ pub async fn serve(
 }
 
 /// Build server status object to respond to client with.
-async fn server_status(client_info: &ClientInfo, config: &Config, server: &Server) -> ServerStatus {
+async fn server_status(client_info: &ClientInfo, server: &Server) -> ServerStatus {
     let status = server.status().await;
     let server_state = server.state();
 
@@ -220,8 +180,8 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
         Some(status) => (status.version.clone(), status.players.max),
         None => (
             ServerVersion {
-                name: config.public.version.clone(),
-                protocol: config.public.protocol,
+                name: server.config.public.version.clone(),
+                protocol: server.config.public.protocol,
             },
             0,
         ),
@@ -229,13 +189,13 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
 
     // Select description, use server MOTD if enabled, or use configured
     let description = {
-        if config.motd.from_server && status.is_some() {
+        if server.config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
             Message::new(Payload::text(match server_state {
-                server::State::Stopped | server::State::Started => &config.motd.sleeping,
-                server::State::Starting => &config.motd.starting,
-                server::State::Stopping => &config.motd.stopping,
+                server::State::Stopped | server::State::Started => &server.config.motd.sleeping,
+                server::State::Starting => &server.config.motd.starting,
+                server::State::Stopping => &server.config.motd.stopping,
             }))
         }
     };
@@ -243,11 +203,11 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
     // Extract favicon from real server status, load from disk, or use default
     let mut favicon = None;
     if favicon::supports_favicon(client_info) {
-        if config.motd.from_server && status.is_some() {
+        if server.config.motd.from_server && status.is_some() {
             favicon = status.as_ref().unwrap().favicon.clone()
         }
         if favicon.is_none() {
-            favicon = Some(server_favicon(config).await);
+            favicon = Some(server_favicon(&server.config).await);
         }
     }
 

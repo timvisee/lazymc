@@ -21,6 +21,7 @@ pub(crate) mod os;
 pub(crate) mod probe;
 pub(crate) mod proto;
 pub(crate) mod proxy;
+pub(crate) mod router;
 pub(crate) mod server;
 pub(crate) mod service;
 pub(crate) mod status;

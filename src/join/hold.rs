@@ -6,7 +6,6 @@ use bytes::BytesMut;
 use tokio::net::TcpStream;
 use tokio::time;
 
-use crate::config::*;
 use crate::server::{Server, State};
 use crate::service;
 
@@ -14,7 +13,6 @@ use super::MethodResult;
 
 /// Hold the client.
 pub async fn occupy(
-    config: Arc<Config>,
     server: Arc<Server>,
     inbound: TcpStream,
     inbound_history: &mut BytesMut,
@@ -27,8 +25,8 @@ pub async fn occupy(
     }
 
     // Start holding, consume client
-    if hold(&config, &server).await? {
-        service::server::route_proxy_queue(inbound, config, inbound_history.clone());
+    if hold(&server).await? {
+        service::server::route_proxy_queue(inbound, &server.config, inbound_history.clone());
         return Ok(MethodResult::Consumed);
     }
 
@@ -39,7 +37,7 @@ pub async fn occupy(
 ///
 /// Returns holding status. `true` if client is held and it should be proxied, `false` it was held
 /// but it timed out.
-async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
+async fn hold<'a>(server: &Server) -> Result<bool, ()> {
     trace!(target: "lazymc", "Started holding client");
 
     // A task to wait for suitable server state
@@ -78,7 +76,7 @@ async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
     };
 
     // Wait for server state with timeout
-    let timeout = Duration::from_secs(config.join.hold.timeout as u64);
+    let timeout = Duration::from_secs(server.config.join.hold.timeout as u64);
     match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
         Ok(true) => {
@@ -94,7 +92,7 @@ async fn hold<'a>(config: &Config, server: &Server) -> Result<bool, ()> {
 
         // Timeout reached, kick with starting message
         Err(_) => {
-            warn!(target: "lazymc", "Held client reached timeout of {}s", config.join.hold.timeout);
+            warn!(target: "lazymc", "Held client reached timeout of {}s", server.config.join.hold.timeout);
             Ok(false)
         }
     }
