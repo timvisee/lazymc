@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.10 (2023-02-20)
+
+- Do not report an error when server exits with status code 143
+
 ## 0.2.9 (2023-02-14)
 
 - Fix dropping all connections when `server.drop_banned_ips` was enabled
