@@ -30,9 +30,9 @@ const STATUS_TIMEOUT: u64 = 20;
 const PING_TIMEOUT: u64 = 10;
 
 /// Monitor server.
-pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
+pub async fn monitor_server(server: Arc<Server>) {
     // Server address
-    let addr = config.server.address;
+    let addr = server.config.server.address;
 
     let mut poll_interval = time::interval(MONITOR_POLL_INTERVAL);
 
@@ -41,13 +41,13 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
 
         // Poll server state and update internal status
         trace!(target: "lazymc::monitor", "Fetching status for {} ... ", addr);
-        let status = poll_server(&config, &server, addr).await;
+        let status = poll_server(&server, addr).await;
         match status {
             // Got status, update
-            Ok(Some(status)) => server.update_status(&config, Some(status)).await,
+            Ok(Some(status)) => server.update_status(Some(status)).await,
 
             // Error, reset status
-            Err(_) => server.update_status(&config, None).await,
+            Err(_) => server.update_status(None).await,
 
             // Didn't get status, but ping fallback worked, leave as-is, show warning
             Ok(None) => {
@@ -56,9 +56,9 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
         }
 
         // Sleep server when it's bedtime
-        if server.should_sleep(&config).await {
+        if server.should_sleep(&server.config).await {
             info!(target: "lazymc::montior", "Server has been idle, sleeping...");
-            server.stop(&config).await;
+            server.stop().await;
         }
 
         // Check whether we should force kill server
@@ -75,20 +75,16 @@ pub async fn monitor_server(config: Arc<Config>, server: Arc<Server>) {
 ///
 /// Returns `Ok` if status/ping succeeded, includes server status most of the time.
 /// Returns `Err` if no connection could be established or if an error occurred.
-pub async fn poll_server(
-    config: &Config,
-    server: &Server,
-    addr: SocketAddr,
-) -> Result<Option<ServerStatus>, ()> {
+pub async fn poll_server(server: &Server, addr: SocketAddr) -> Result<Option<ServerStatus>, ()> {
     // Fetch status
-    if let Ok(status) = fetch_status(config, addr).await {
+    if let Ok(status) = fetch_status(&server.config, addr).await {
         return Ok(Some(status));
     }
 
     // Try ping fallback if server is currently started
     if server.state() == State::Started {
         debug!(target: "lazymc::monitor", "Failed to get status from started server, trying ping...");
-        do_ping(config, addr).await?;
+        do_ping(&server.config, addr).await?;
     }
 
     Err(())

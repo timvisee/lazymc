@@ -14,9 +14,9 @@ use crate::server::Server;
 const WATCH_DEBOUNCE: Duration = Duration::from_secs(2);
 
 /// Service to watch server file changes.
-pub fn service(config: Arc<Config>, server: Arc<Server>) {
+pub fn service(server: Arc<Server>) {
     // Ensure server directory is set, it must exist
-    let dir = match ConfigServer::server_directory(&config) {
+    let dir = match ConfigServer::server_directory(&server.config) {
         Some(dir) if dir.is_dir() => dir,
         _ => {
             warn!(target: "lazymc", "Server directory doesn't exist, can't watch file changes to reload whitelist and banned IPs");
@@ -28,11 +28,11 @@ pub fn service(config: Arc<Config>, server: Arc<Server>) {
     #[allow(clippy::blocks_in_if_conditions)]
     while {
         // Update all files once
-        reload_bans(&config, &server, &dir.join(ban::FILE));
-        reload_whitelist(&config, &server, &dir);
+        reload_bans(&server.config, &server, &dir.join(ban::FILE));
+        reload_whitelist(&server.config, &server, &dir);
 
         // Watch for changes, update accordingly
-        watch_server(&config, &server, &dir)
+        watch_server(&server.config, &server, &dir)
     } {}
 }
 

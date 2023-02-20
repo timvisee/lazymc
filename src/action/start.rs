@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use clap::ArgMatches;
 
@@ -16,18 +15,19 @@ const RCON_PASSWORD_LENGTH: usize = 32;
 pub fn invoke(matches: &ArgMatches) -> Result<(), ()> {
     // Load config
     #[allow(unused_mut)]
-    let mut config = config::load(matches);
+    let mut configs = config::load(matches);
 
-    // Prepare RCON if enabled
-    #[cfg(feature = "rcon")]
-    prepare_rcon(&mut config);
+    for config in configs.iter_mut() {
+        // Prepare RCON if enabled
+        #[cfg(feature = "rcon")]
+        prepare_rcon(config);
 
-    // Rewrite server server.properties file
-    rewrite_server_properties(&config);
+        // Rewrite server server.properties file
+        rewrite_server_properties(config);
+    }
 
     // Start server service
-    let config = Arc::new(config);
-    service::server::service(config)
+    service::server::service(configs)
 }
 
 /// Prepare RCON.

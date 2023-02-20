@@ -1,6 +1,5 @@
 use tokio::net::TcpStream;
 
-use crate::config::*;
 use crate::net;
 use crate::proto::action;
 use crate::proto::client::Client;
@@ -11,7 +10,6 @@ use super::MethodResult;
 /// Kick the client.
 pub async fn occupy(
     client: &Client,
-    config: &Config,
     server: &Server,
     mut inbound: TcpStream,
 ) -> Result<MethodResult, ()> {
@@ -20,9 +18,9 @@ pub async fn occupy(
     // Select message and kick
     let msg = match server.state() {
         server::State::Starting | server::State::Stopped | server::State::Started => {
-            &config.join.kick.starting
+            &server.config.join.kick.starting
         }
-        server::State::Stopping => &config.join.kick.stopping,
+        server::State::Stopping => &server.config.join.kick.stopping,
     };
     action::kick(client, msg, &mut inbound.split().1).await?;
 

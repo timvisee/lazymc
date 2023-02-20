@@ -54,7 +54,6 @@ pub async fn serve(
     client: &Client,
     client_info: ClientInfo,
     mut inbound: TcpStream,
-    config: Arc<Config>,
     server: Arc<Server>,
     queue: BytesMut,
 ) -> Result<(), ()> {
@@ -98,7 +97,7 @@ pub async fn serve(
             debug!(target: "lazymc::lobby", "Login on lobby server (user: {})", login_start.name);
 
             // Replay Forge payload
-            if config.server.forge {
+            if server.config.server.forge {
                 forge::replay_login_payload(client, &mut inbound, server.clone(), &mut inbound_buf)
                     .await?;
                 let (_returned_reader, returned_writer) = inbound.split();
@@ -122,12 +121,12 @@ pub async fn serve(
             send_lobby_play_packets(client, &client_info, &mut writer, &server).await?;
 
             // Wait for server to come online
-            stage_wait(client, &client_info, &server, &config, &mut writer).await?;
+            stage_wait(client, &client_info, &server, &mut writer).await?;
 
             // Start new connection to server
             let server_client_info = client_info.clone();
             let (server_client, mut outbound, mut server_buf) =
-                connect_to_server(&server_client_info, &inbound, &config).await?;
+                connect_to_server(&server_client_info, &inbound, &server.config).await?;
             let (returned_reader, returned_writer) = inbound.split();
             reader = returned_reader;
             writer = returned_writer;
@@ -145,7 +144,7 @@ pub async fn serve(
             packets::play::title::send(client, &client_info, &mut writer, "").await?;
 
             // Play ready sound if configured
-            play_lobby_ready_sound(client, &client_info, &mut writer, &config).await?;
+            play_lobby_ready_sound(client, &client_info, &mut writer, &server.config).await?;
 
             // Wait a second because Notchian servers are slow
             // See: https://wiki.vg/Protocol#Login_Success
@@ -287,19 +286,18 @@ async fn stage_wait(
     client: &Client,
     client_info: &ClientInfo,
     server: &Server,
-    config: &Config,
     writer: &mut WriteHalf<'_>,
 ) -> Result<(), ()> {
     select! {
-        a = keep_alive_loop(client, client_info, writer, config) => a,
-        b = wait_for_server(server, config) => b,
+        a = keep_alive_loop(client, client_info, writer, &server.config) => a,
+        b = wait_for_server(server) => b,
     }
 }
 
 /// Wait for the server to come online.
 ///
 /// Returns `Ok(())` once the server is online, returns `Err(())` if waiting failed.
-async fn wait_for_server(server: &Server, config: &Config) -> Result<(), ()> {
+async fn wait_for_server(server: &Server) -> Result<(), ()> {
     debug!(target: "lazymc::lobby", "Waiting on server to come online...");
 
     // A task to wait for suitable server state
@@ -331,7 +329,7 @@ async fn wait_for_server(server: &Server, config: &Config) -> Result<(), ()> {
     };
 
     // Wait for server state with timeout
-    let timeout = Duration::from_secs(config.join.lobby.timeout as u64);
+    let timeout = Duration::from_secs(server.config.join.lobby.timeout as u64);
     match time::timeout(timeout, task_wait).await {
         // Relay client to proxy
         Ok(true) => {

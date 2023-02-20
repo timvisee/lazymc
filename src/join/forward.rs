@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use bytes::BytesMut;
 use tokio::net::TcpStream;
 
@@ -11,7 +9,7 @@ use super::MethodResult;
 
 /// Forward the client.
 pub async fn occupy(
-    config: Arc<Config>,
+    config: &Config,
     inbound: TcpStream,
     inbound_history: &mut BytesMut,
 ) -> Result<MethodResult, ()> {
