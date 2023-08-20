@@ -7,11 +7,6 @@ stages:
   - pre-release
   - release
 
-default:
-  tags:
-    - linux
-    - timvisee-linux
-
 # Variable defaults
 variables:
   RUST_VERSION: stable
