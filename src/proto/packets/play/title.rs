@@ -70,7 +70,7 @@ async fn send_v1_16_3(
     packet::write_packet(
         Title {
             action: if title.is_empty() && subtitle.is_empty() {
-                // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
+                // Defaults: https://minecraft.wiki/w/Commands/title#Detail
                 TitleAction::SetTimesAndDisplay {
                     fade_in: 10,
                     stay: 70,
@@ -121,7 +121,7 @@ async fn send_v1_17(
     // Set title times
     packet::write_packet(
         if title.is_empty() && subtitle.is_empty() {
-            // Defaults: https://minecraft.fandom.com/wiki/Commands/title#Detail
+            // Defaults: https://minecraft.wiki/w/Commands/title#Detail
             SetTitleTimes {
                 fade_in: 10,
                 stay: 70,
