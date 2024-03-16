@@ -281,15 +281,10 @@ async fn server_favicon(config: &Config) -> String {
     }
 
     // Read icon data
-    let data = match fs::read(path).await.map_err(|err| {
-        error!(target: "lazymc", "Failed to read favicon from {}: {}", SERVER_ICON_FILE, err);
-    }) {
-        Ok(data) => data,
-        Err(err) => {
-            error!(target: "lazymc::status", "Failed to load server icon from disk, using default: {:?}", err);
-            return favicon::default_favicon();
-        }
-    };
+    let data = fs::read(path).await.unwrap_or_else(|err| {
+        error!(target: "lazymc::status", "Failed to read favicon from {}, using default: {err}", SERVER_ICON_FILE);
+        favicon::default_favicon().into_bytes()
+    });
 
     favicon::encode_favicon(&data)
 }
