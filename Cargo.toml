@@ -52,7 +52,7 @@ futures = { version = "0.3", default-features = false, features = ["executor"] }
 log = "0.4"
 minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "edfdf87" }
 named-binary-tag = "0.6"
-nix = "0.26"
+nix = { version = "0.28", features = ["process", "signal"] }
 notify = "4.0"
 pretty_env_logger = "0.5"
 proxy-protocol = "0.5"
