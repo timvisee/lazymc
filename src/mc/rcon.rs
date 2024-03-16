@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use async_std::net::TcpStream;
-use async_std::prelude::*;
 use rust_rcon::{Connection, Error as RconError};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 use tokio::time;
 
 use crate::config::Config;
@@ -17,7 +17,7 @@ const QUIRK_RCON_GRACE_TIME: Duration = Duration::from_millis(200);
 
 /// An RCON client.
 pub struct Rcon {
-    con: Connection,
+    con: Connection<TcpStream>,
 }
 
 impl Rcon {
@@ -39,7 +39,7 @@ impl Rcon {
         // Start connection
         let con = Connection::builder()
             .enable_minecraft_quirks(true)
-            .connect_stream(stream, pass)
+            .handshake(stream, pass)
             .await?;
 
         Ok(Self { con })
