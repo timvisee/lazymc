@@ -31,7 +31,7 @@ lobby = ["md-5", "uuid"]
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.21"
+base64 = "0.22"
 bytes = "1.1"
 chrono = "0.4"
 clap = { version = "4.0.32", default-features = false, features = [
@@ -45,7 +45,7 @@ clap = { version = "4.0.32", default-features = false, features = [
     "unicode",
 ] }
 colored = "2.0"
-derive_builder = "0.12"
+derive_builder = "0.20"
 dotenv = "0.15"
 flate2 = { version = "1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3", default-features = false, features = ["executor"] }
@@ -54,7 +54,7 @@ minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protoco
 named-binary-tag = "0.6"
 nix = "0.26"
 notify = "4.0"
-pretty_env_logger = "0.4"
+pretty_env_logger = "0.5"
 proxy-protocol = "0.5"
 quartz_nbt = "0.2"
 rand = "0.8"
@@ -74,7 +74,7 @@ tokio = { version = "1", default-features = false, features = [
     "fs",
 ] }
 toml = "0.5"
-version-compare = "0.1"
+version-compare = "0.2"
 
 # Feature: rcon
 rust_rcon = { package = "rcon", version = "0.5.2", optional = true }
