@@ -108,8 +108,8 @@ pub struct Config {
 impl Config {
     /// Load configuration from file.
     pub fn load(path: PathBuf) -> Result<Self, io::Error> {
-        let data = fs::read(&path)?;
-        let mut config: Config = toml::from_slice(&data)?;
+        let data = fs::read_to_string(&path)?;
+        let mut config: Config = toml::from_str(&data).map_err(io::Error::other)?;
 
         // Show warning if config version is problematic
         match &config.config.version {
