@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.11 (2024-03-16)
+
+- Add support for Minecraft 1.20.3 and 1.20.4
+- Improve error handling of parsing server favicon
+- Fix typo in log message
+- Update dependencies
+
 ## 0.2.10 (2023-02-20)
 
 - Do not report an error when server exits with status code 143
