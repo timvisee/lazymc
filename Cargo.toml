@@ -50,7 +50,7 @@ dotenv = "0.15"
 flate2 = { version = "1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3", default-features = false, features = ["executor"] }
 log = "0.4"
-minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "edfdf87" }
+minecraft-protocol = { git = "https://github.com/timvisee/rust-minecraft-protocol", rev = "b00328e" }
 named-binary-tag = "0.6"
 nix = { version = "0.28", features = ["process", "signal"] }
 notify = "4.0"
@@ -81,7 +81,7 @@ rust_rcon = { package = "rcon", version = "0.6", default-features = false, featu
 
 # Feature: lobby
 md-5 = { version = "0.10", optional = true }
-uuid = { version = "0.7", optional = true, features = ["v3"] }
+uuid = { version = "1.7", optional = true, features = ["v3"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
