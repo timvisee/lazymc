@@ -652,7 +652,7 @@ async fn drain_stream(reader: &mut ReadHalf<'_>) -> Result<(), ()> {
     let mut drain_buf = [0; 8 * 1024];
     loop {
         match reader.try_read(&mut drain_buf) {
-            Ok(read) if read == 0 => return Ok(()),
+            Ok(0) => return Ok(()),
             Err(err) if err.kind() == ErrorKind::WouldBlock => return Ok(()),
             Ok(_) => continue,
             Err(err) => {

@@ -25,7 +25,7 @@ pub fn service(config: Arc<Config>, server: Arc<Server>) {
     };
 
     // Keep watching
-    #[allow(clippy::blocks_in_if_conditions)]
+    #[allow(clippy::blocks_in_conditions)]
     while {
         // Update all files once
         reload_bans(&config, &server, &dir.join(ban::FILE));

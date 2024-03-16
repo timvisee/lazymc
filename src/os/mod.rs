@@ -67,11 +67,11 @@ pub fn unfreeze(pid: u32) -> bool {
 
 #[cfg(unix)]
 pub fn unix_signal(pid: u32, signal: signal::Signal) -> bool {
-    return match signal::kill(Pid::from_raw(pid as i32), signal) {
+    match signal::kill(Pid::from_raw(pid as i32), signal) {
         Ok(()) => true,
         Err(err) => {
             warn!(target: "lazymc", "Sending {signal} signal to server failed: {err}");
             false
         }
-    };
+    }
 }
