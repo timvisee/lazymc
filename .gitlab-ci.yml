@@ -52,7 +52,7 @@ check-stable:
 check-msrv:
   <<: *check-base
   variables:
-    RUST_VERSION: 1.64.0
+    RUST_VERSION: 1.74.0
   only:
     - master
 

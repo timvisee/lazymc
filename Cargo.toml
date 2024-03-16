@@ -11,6 +11,7 @@ keywords = ["minecraft", "server", "idle", "cli"]
 categories = ["command-line-interface", "games"]
 exclude = ["/.github", "/contrib"]
 edition = "2021"
+rust-version = "1.74.0"
 
 [profile.release]
 codegen-units = 1
