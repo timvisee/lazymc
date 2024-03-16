@@ -18,8 +18,8 @@
 # Server version & protocol hint.
 # Sent to clients until actual server version is known.
 # See: https://git.io/J1Fvx
-#version = "1.19.3"
-#protocol = 761
+#version = "1.20.3"
+#protocol = 765
 
 [server]
 # Server address. Internal IP and port of server started by lazymc to proxy to.

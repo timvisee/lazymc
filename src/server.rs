@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::FutureExt;
-use minecraft_protocol::data::server_status::ServerStatus;
+use minecraft_protocol::version::v1_20_3::status::ServerStatus;
 use tokio::process::Command;
 use tokio::sync::watch;
 #[cfg(feature = "rcon")]
