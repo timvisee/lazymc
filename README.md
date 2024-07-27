@@ -149,7 +149,7 @@ A list of third-party implementations, projects using lazymc, that you might
 find useful:
 
 - Docker: [crbanman/papermc-lazymc](https://hub.docker.com/r/crbanman/papermc-lazymc) _(PaperMC with lazymc in Docker)_
-- Docker Proxy: [joesturge/docker-minecraft-server](https://github.com/joesturge/docker-minecraft-server) _(Works with (itzg/docker-minecraft-server)[https://github.com/itzg/docker-minecraft-server])_
+- Docker Proxy: [joesturge/docker-minecraft-server](https://github.com/joesturge/docker-minecraft-server) _(Works with [itzg/docker-minecraft-server](https://github.com/itzg/docker-minecraft-server))_
 
 ## License
 
