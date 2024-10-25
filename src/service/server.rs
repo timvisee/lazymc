@@ -67,6 +67,9 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         route(inbound, config.clone(), server.clone());
     }
 
+    // Spawn service to redirect stdin to server
+    tokio::spawn(service::stdin::service(config.clone(), server.clone()));
+
     Ok(())
 }
 
