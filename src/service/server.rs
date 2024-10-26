@@ -62,10 +62,14 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
         || service::file_watcher::service(config, server)
     });
 
+    // Spawn service to redirect stdin to server
+    tokio::spawn(service::stdin::service(config.clone(), server.clone()));
+    
     // Route all incomming connections
     while let Ok((inbound, _)) = listener.accept().await {
         route(inbound, config.clone(), server.clone());
     }
+
 
     Ok(())
 }
