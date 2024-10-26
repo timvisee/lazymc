@@ -1,10 +1,12 @@
 use std::net::IpAddr;
+use std::process::Stdio;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::FutureExt;
 use minecraft_protocol::version::v1_20_3::status::ServerStatus;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::sync::watch;
 #[cfg(feature = "rcon")]
@@ -53,6 +55,11 @@ pub struct Server {
     ///
     /// Set if a server process is running.
     pid: Mutex<Option<u32>>,
+
+    /// Server process stdin.
+    ///
+    /// Handle to write to the server process.
+    stdin: Mutex<Option<tokio::process::ChildStdin>>,
 
     /// Last known server status.
     ///
@@ -394,6 +401,20 @@ impl Server {
     pub fn set_whitelist_blocking(&self, whitelist: Option<Whitelist>) {
         futures::executor::block_on(async { self.set_whitelist(whitelist).await })
     }
+
+    /// Sends a command to the Minecraft server's stdin.
+    pub async fn send_command(&self, command: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Lock the stdin handle
+        let mut stdin = self.stdin.lock().await;
+        // Check if stdin is available and send the command
+        if let Some(ref mut stdin_handle) = *stdin {
+            stdin_handle.write_all(command.as_bytes()).await?;
+            Ok(())
+        } else {
+            Err("Server stdin handle is not available".into())
+        }
+        
+    }
 }
 
 impl Default for Server {
@@ -405,6 +426,7 @@ impl Default for Server {
             state_watch_sender,
             state_watch_receiver,
             pid: Default::default(),
+            stdin: Default::default(),
             status: Default::default(),
             last_active: Default::default(),
             keep_online_until: Default::default(),
@@ -470,6 +492,7 @@ pub async fn invoke_server_cmd(
     let mut cmd = Command::new(&args[0]);
     cmd.args(args.iter().skip(1));
     cmd.kill_on_drop(true);
+    cmd.stdin(Stdio::piped());
 
     // Set working directory
     if let Some(ref dir) = ConfigServer::server_directory(&config) {
@@ -491,6 +514,9 @@ pub async fn invoke_server_cmd(
         .lock()
         .await
         .replace(child.id().expect("unknown server PID"));
+
+    // Remember stdin
+    state.stdin.lock().await.replace(child.stdin.take().expect("unknown server stdin"));
 
     // Wait for process to exit, handle status
     let crashed = match child.wait().await {
@@ -520,6 +546,9 @@ pub async fn invoke_server_cmd(
 
     // Forget server PID
     state.pid.lock().await.take();
+
+    // Forget stdin
+    state.stdin.lock().await.take();
 
     // Give server a little more time to quit forgotten threads
     time::sleep(SERVER_QUIT_COOLDOWN).await;
@@ -673,3 +702,4 @@ async fn unfreeze_server_signal(config: &Config, server: &Server) -> bool {
 
     true
 }
+
