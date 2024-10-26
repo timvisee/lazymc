@@ -408,7 +408,7 @@ impl Server {
         let mut stdin = self.stdin.lock().await;
         // Check if stdin is available and send the command
         if let Some(ref mut stdin_handle) = *stdin {
-            stdin_handle.write_all(command.as_bytes()).await?;
+            stdin_handle.write_all(format!("{}\n", command).as_bytes()).await?;
             Ok(())
         } else {
             Err("Server stdin handle is not available".into())

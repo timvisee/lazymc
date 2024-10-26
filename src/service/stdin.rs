@@ -3,6 +3,7 @@ use tokio::io::{self, AsyncBufReadExt, BufReader};
 use crate::config::Config;
 use crate::server::Server;
 use crate::service::signal::shutdown;
+use crate::util::error;
 
 /// Service to read terminal input and send it to the server via piped stdin or RCON handling.
 pub async fn service(config: Arc<Config>, server: Arc<Server>) {
@@ -21,7 +22,7 @@ pub async fn service(config: Arc<Config>, server: Arc<Server>) {
             "!quit" | "!exit" => {
                 info!("Received quit command");
                 shutdown(&config, &server).await;
-                break;
+                error::quit();
             }
 
             // Start the server
@@ -38,7 +39,6 @@ pub async fn service(config: Arc<Config>, server: Arc<Server>) {
 
             // Any other command is sent to the Minecraft server's stdin
             command => {
-                info!("Sending command to Minecraft server: {}", command);
                 if let Err(e) = server.send_command(command).await {
                     eprintln!("Failed to send command to server: {}", e);
                 }
