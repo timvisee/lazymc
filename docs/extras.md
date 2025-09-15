@@ -19,7 +19,7 @@ of new releases.
 
 ## Tips
 
-- [bash with start command](./command_bash.md):
+- [bash with start command](./command-bash.md):
   _how to properly use a bash script as server start command_
 
 ## Experimental features
