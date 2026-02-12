@@ -9,7 +9,7 @@ use version_compare::Cmp;
 
 use crate::proto;
 use crate::util::error::{quit_error, quit_error_msg, ErrorHintsBuilder};
-use crate::util::serde::to_socket_addrs;
+use crate::util::serde::{to_socket_addrs, to_socket_addrs_multiple};
 
 /// Default configuration file location.
 pub const CONFIG_FILE: &str = "lazymc.toml";
@@ -135,8 +135,8 @@ impl Config {
 #[serde(default)]
 pub struct Public {
     /// Public address.
-    #[serde(deserialize_with = "to_socket_addrs")]
-    pub address: SocketAddr,
+    #[serde(deserialize_with = "to_socket_addrs_multiple")]
+    pub address: Box<[SocketAddr]>,
 
     /// Minecraft protocol version name hint.
     pub version: String,
@@ -148,7 +148,7 @@ pub struct Public {
 impl Default for Public {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:25565".parse().unwrap(),
+            address: Box::new(["0.0.0.0:25565".parse().unwrap()]),
             version: proto::PROTO_DEFAULT_VERSION.to_string(),
             protocol: proto::PROTO_DEFAULT_PROTOCOL,
         }

@@ -14,6 +14,8 @@
 # Public address. IP and port users connect to.
 # Shows sleeping status, starts server on connect, and proxies to server.
 #address = "0.0.0.0:25565"
+# Also supports multiple addresses
+# address = ["127.0.0.1:25565", "::1:12345"]
 
 # Server version & protocol hint.
 # Sent to clients until actual server version is known.
