@@ -183,7 +183,9 @@ async fn wait_for_status(client: &Client, stream: &mut TcpStream) -> Result<Serv
 
         // Catch status response
         if packet.id == packets::status::CLIENT_STATUS {
-            let status = StatusResponse::decode(&mut packet.data.as_slice()).map_err(|_| ())?;
+            let status = StatusResponse::decode(&mut packet.data.as_slice()).map_err(|err| {
+                debug!(target: "lazymc", "Failed to decode status response from backend server, ignoring: {:?}", err);
+            })?;
             return Ok(status.server_status);
         }
     }
