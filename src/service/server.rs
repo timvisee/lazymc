@@ -1,5 +1,7 @@
+use std::future::poll_fn;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use bytes::BytesMut;
 use futures::FutureExt;
@@ -24,19 +26,27 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     let server = Arc::new(Server::default());
 
     // Listen for new connections
-    let listener = TcpListener::bind(config.public.address)
-        .await
-        .map_err(|err| {
-            quit_error(
-                anyhow!(err).context("Failed to start proxy server"),
-                ErrorHints::default(),
-            );
-        })?;
+    let mut listeners = Vec::with_capacity(config.public.address.len());
+    for addr in &config.public.address {
+        let listener = TcpListener::bind(addr)
+            .await
+            .map_err(|err| {
+                quit_error(
+                    anyhow!(err).context("Failed to start proxy server"),
+                    ErrorHints::default(),
+                );
+            })?;
+        listeners.push(listener);
+    }
 
     info!(
         target: "lazymc",
-        "Proxying public {} to server {}",
-        config.public.address, config.server.address,
+        "Proxying public [{}] to server {}",
+        // lazy iterator join
+        &config.public.address.iter()
+            .map(ToString::to_string)
+            .fold(String::new(), |s, n| [s, n].join(", "))[2..],
+        config.server.address,
     );
 
     if config.lockout.enabled {
@@ -63,7 +73,16 @@ pub async fn service(config: Arc<Config>) -> Result<(), ()> {
     });
 
     // Route all incomming connections
-    while let Ok((inbound, _)) = listener.accept().await {
+    let accept_many = |cx: &mut Context<'_>| {
+        for l in &listeners {
+            if let Poll::Ready(r) = l.poll_accept(cx) {
+                return Poll::Ready(r)
+            }
+        }
+        Poll::Pending
+    };
+
+    while let Ok((inbound, _)) = poll_fn(accept_many).await {
         route(inbound, config.clone(), server.clone());
     }
 
