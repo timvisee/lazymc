@@ -297,6 +297,13 @@ pub enum Method {
 
     /// Keep client in temporary fake lobby until server is ready.
     Lobby,
+
+    /// Hold client in the configuration state, then transfer it to the server.
+    ///
+    /// Requires a client on Minecraft 1.20.5 or above, and `accepts-transfers=true`
+    /// in the server properties. Unlike `hold`, this is not limited by the 30 second
+    /// client timeout, because the client is kept alive with keep alive packets.
+    Transfer,
 }
 
 /// Join configuration.
@@ -321,6 +328,10 @@ pub struct Join {
     /// Join lobby configuration.
     #[serde(default)]
     pub lobby: JoinLobby,
+
+    /// Join transfer configuration.
+    #[serde(default)]
+    pub transfer: JoinTransfer,
 }
 
 impl Default for Join {
@@ -331,6 +342,7 @@ impl Default for Join {
             hold: Default::default(),
             forward: Default::default(),
             lobby: Default::default(),
+            transfer: Default::default(),
         }
     }
 }
@@ -366,6 +378,33 @@ pub struct JoinHold {
 impl Default for JoinHold {
     fn default() -> Self {
         Self { timeout: 25 }
+    }
+}
+
+/// Join transfer configuration.
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct JoinTransfer {
+    /// Maximum time in seconds to keep the client in the configuration state.
+    pub timeout: u32,
+
+    /// Interval in seconds between keep alive packets sent to the client.
+    pub keep_alive_interval: u32,
+
+    /// Address the client is transferred to once the server is ready.
+    ///
+    /// This must be reachable by the client, not by lazymc. Defaults to the
+    /// public address lazymc listens on.
+    pub address: Option<String>,
+}
+
+impl Default for JoinTransfer {
+    fn default() -> Self {
+        Self {
+            timeout: 600,
+            keep_alive_interval: 10,
+            address: None,
+        }
     }
 }
 

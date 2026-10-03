@@ -13,6 +13,7 @@ pub mod hold;
 pub mod kick;
 #[cfg(feature = "lobby")]
 pub mod lobby;
+pub mod transfer;
 
 /// A result returned by a join occupy method.
 pub enum MethodResult {
@@ -56,6 +57,18 @@ pub async fn occupy(
                     server.clone(),
                     inbound,
                     &mut inbound_history,
+                )
+                .await?
+            }
+
+            // Transfer method, hold client in configuration state then transfer it
+            Method::Transfer => {
+                transfer::occupy(
+                    &client,
+                    client_info.clone(),
+                    config.clone(),
+                    server.clone(),
+                    inbound,
                 )
                 .await?
             }

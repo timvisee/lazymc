@@ -93,6 +93,9 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 #    "hold",
 #    "kick",
 #]
+# Note: the "transfer" method is recommended over "hold" for clients on
+# Minecraft 1.20.5 or above, because it is not bound by the 30 second client
+# timeout. See the [join.transfer] section below.
 
 [join.kick]
 # Kick occupation method.
@@ -112,6 +115,30 @@ command = "java -Xmx1G -Xms1G -jar server.jar --nogui"
 # Hold client for number of seconds on connect while server starts.
 # Keep below Minecraft timeout of 30 seconds.
 #timeout = 25
+
+[join.transfer]
+# Transfer occupation method.
+# Holds back a joining client in the configuration state while the server starts,
+# then tells it to reconnect to the server once it is ready.
+# The client is kept alive with keep alive packets, so unlike the hold method this
+# is not limited by the 30 second Minecraft client timeout.
+# The client reconnects on its own and goes through a full handshake with the real
+# server, which means modded servers (Forge, NeoForge, FTB) keep working.
+# Consumes client, not allowing other join methods afterwards.
+#
+# - Client must use Minecraft version 1.20.5 or above
+# - Server must have 'accepts-transfers=true' in server.properties
+# Clients on older versions are passed on to the next join method.
+
+# Maximum time in seconds to hold the client while the server starts.
+#timeout = 600
+
+# Interval in seconds between keep alive packets sent to the held client.
+#keep_alive_interval = 10
+
+# Address the client is told to reconnect to, as reachable by the client.
+# Defaults to the public address lazymc listens on, which is usually correct.
+#address = "example.com:25565"
 
 [join.forward]
 # Forward occupation method.
