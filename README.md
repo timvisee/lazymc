@@ -37,6 +37,7 @@ https://user-images.githubusercontent.com/856222/141378688-882082be-9efa-4cfe-81
 - Very efficient, lightweight & low-profile (~3KB RAM)
 - Supports Minecraft Java Edition 1.20.3+
 - Configure joining client occupation methods:
+  - Transfer: hold clients in the configuration state while the server starts, then transfer them to it, without the 30 second timeout of hold ([docs](./docs/join-method-transfer.md))
   - Hold: hold clients when server starts, relay when ready, without them noticing
   - Kick: kick clients when server starts, with a starting message
   - Forward: forward client to another IP when server starts

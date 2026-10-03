@@ -79,6 +79,12 @@ pub enum ClientState {
     /// State to login to server.
     Login,
 
+    /// State to configure the client, between login and play (1.20.2+).
+    ///
+    /// Clients may be kept here indefinitely by sending keep alive packets,
+    /// which is not possible in the login state.
+    Configuration,
+
     /// State to play on the server.
     #[allow(unused)]
     Play,
@@ -91,6 +97,7 @@ impl ClientState {
             0 => Some(Self::Handshake),
             1 => Some(Self::Status),
             2 => Some(Self::Login),
+            3 => Some(Self::Configuration),
             _ => None,
         }
     }
@@ -101,6 +108,7 @@ impl ClientState {
             Self::Handshake => 0,
             Self::Status => 1,
             Self::Login => 2,
+            Self::Configuration => 3,
             Self::Play => -1,
         }
     }
