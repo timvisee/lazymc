@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use futures::FutureExt;
 use minecraft_protocol::version::v1_20_3::status::ServerStatus;
@@ -64,6 +64,12 @@ pub struct Server {
     /// The last time there was activity on the server. Also set at the moment the server comes
     /// online.
     last_active: RwLock<Option<Instant>>,
+
+    /// Wall clock time the server last came online.
+    ///
+    /// Unlike `last_active` this uses the system clock, so it can be formatted and
+    /// shown to users. Remains set after the server goes to sleep again.
+    last_online: RwLock<Option<SystemTime>>,
 
     /// Force server to stay online until.
     keep_online_until: RwLock<Option<Instant>>,
@@ -158,6 +164,10 @@ impl Server {
         };
 
         // Online/offline messages
+        if new == State::Started {
+            self.last_online.write().await.replace(SystemTime::now());
+        }
+
         match new {
             State::Started => info!(target: "lazymc::monitor", "Server is now online"),
             State::Stopped => info!(target: "lazymc::monitor", "Server is now sleeping"),
@@ -203,6 +213,11 @@ impl Server {
 
             self.status.write().await.replace(status);
         }
+    }
+
+    /// Time the server last came online, if it ever did.
+    pub async fn last_online(&self) -> Option<SystemTime> {
+        *self.last_online.read().await
     }
 
     /// Try to start the server.
@@ -411,6 +426,7 @@ impl Default for Server {
             pid: Default::default(),
             status: Default::default(),
             last_active: Default::default(),
+            last_online: Default::default(),
             keep_online_until: Default::default(),
             kill_at: Default::default(),
             banned_ips: Default::default(),
