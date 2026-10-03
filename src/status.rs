@@ -231,11 +231,12 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
         if config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
-            match server_state {
+            let motd = match server_state {
                 server::State::Stopped | server::State::Started => config.motd.sleeping.clone(),
                 server::State::Starting => config.motd.starting.clone(),
                 server::State::Stopping => config.motd.stopping.clone(),
-            }
+            };
+            fill_motd_placeholders(&motd, server).await
         }
     };
 
@@ -286,4 +287,51 @@ async fn server_favicon(config: &Config) -> String {
     });
 
     favicon::encode_favicon(&data)
+}
+
+/// Replace placeholders in a configured MOTD.
+///
+/// Supported placeholders:
+/// - `{last_online}`: how long ago the server was last online, `never` if it
+///   has not been online since lazymc started
+fn fill_motd_placeholders<'a>(
+    motd: &'a str,
+    server: &'a Server,
+) -> impl std::future::Future<Output = String> + 'a {
+    async move {
+        if !motd.contains("{last_online}") {
+            return motd.to_string();
+        }
+
+        let value = match server.last_online().await {
+            Some(time) => match time.elapsed() {
+                Ok(elapsed) => format_duration_ago(elapsed),
+                Err(_) => "just now".into(),
+            },
+            None => "never".into(),
+        };
+
+        motd.replace("{last_online}", &value)
+    }
+}
+
+/// Format a duration as a short human readable string, such as `2h 5m ago`.
+fn format_duration_ago(duration: std::time::Duration) -> String {
+    let secs = duration.as_secs();
+
+    if secs < 60 {
+        return "just now".into();
+    }
+
+    let days = secs / 86400;
+    let hours = (secs % 86400) / 3600;
+    let minutes = (secs % 3600) / 60;
+
+    if days > 0 {
+        format!("{days}d {hours}h ago")
+    } else if hours > 0 {
+        format!("{hours}h {minutes}m ago")
+    } else {
+        format!("{minutes}m ago")
+    }
 }
