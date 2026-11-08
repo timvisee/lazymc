@@ -6,7 +6,7 @@ use minecraft_protocol::decoder::Decoder;
 use minecraft_protocol::encoder::Encoder;
 use minecraft_protocol::version::v1_14_4::handshake::Handshake;
 use minecraft_protocol::version::v1_14_4::login::LoginStart;
-use minecraft_protocol::version::v1_20_3::status::{ServerStatus, StatusResponse};
+use minecraft_protocol::version::v1_20_3::status::{Description, ServerStatus, StatusResponse};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
@@ -231,11 +231,12 @@ async fn server_status(client_info: &ClientInfo, config: &Config, server: &Serve
         if config.motd.from_server && status.is_some() {
             status.as_ref().unwrap().description.clone()
         } else {
-            match server_state {
+            let motd = match server_state {
                 server::State::Stopped | server::State::Started => config.motd.sleeping.clone(),
                 server::State::Starting => config.motd.starting.clone(),
                 server::State::Stopping => config.motd.stopping.clone(),
-            }
+            };
+            Description::Text(motd)
         }
     };
 
