@@ -15,6 +15,11 @@
 # Shows sleeping status, starts server on connect, and proxies to server.
 #address = "0.0.0.0:25565"
 
+# A second address for a trusted proxy in front (such as mc-router), which must send a PROXY protocol v2
+# header on every connection; the client's address is taken from it (for bans, logs, and the PROXY header lazymc
+# sends with send_proxy_v2). Never expose it to anyone but that proxy: whoever reaches it can claim any address.
+#proxy_address = "127.0.0.1:25566"
+
 # Server version & protocol hint.
 # Sent to clients until actual server version is known.
 # See: https://git.io/J1Fvx

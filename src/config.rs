@@ -143,6 +143,12 @@ pub struct Public {
 
     /// Minecraft protocol version hint.
     pub protocol: u32,
+
+    /// A second public address that requires a PROXY protocol v2 header on every connection (sent by a
+    /// trusted proxy in front, such as mc-router) and takes the client's address from it. Only expose it to that
+    /// proxy: whoever can reach it can claim any client address.
+    #[serde(default)]
+    pub proxy_address: Option<String>,
 }
 
 impl Default for Public {
@@ -151,6 +157,7 @@ impl Default for Public {
             address: "0.0.0.0:25565".parse().unwrap(),
             version: proto::PROTO_DEFAULT_VERSION.to_string(),
             protocol: proto::PROTO_DEFAULT_PROTOCOL,
+            proxy_address: None,
         }
     }
 }
