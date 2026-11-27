@@ -18,6 +18,7 @@ pub async fn occupy(
     server: Arc<Server>,
     inbound: TcpStream,
     inbound_history: &mut BytesMut,
+    client: std::net::SocketAddr,
 ) -> Result<MethodResult, ()> {
     trace!(target: "lazymc", "Using hold method to occupy joining client");
 
@@ -28,7 +29,7 @@ pub async fn occupy(
 
     // Start holding, consume client
     if hold(&config, &server).await? {
-        service::server::route_proxy_queue(inbound, config, inbound_history.clone());
+        service::server::route_proxy_queue(inbound, config, inbound_history.clone(), client);
         return Ok(MethodResult::Consumed);
     }
 

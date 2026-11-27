@@ -14,6 +14,7 @@ pub async fn occupy(
     config: Arc<Config>,
     inbound: TcpStream,
     inbound_history: &mut BytesMut,
+    client: std::net::SocketAddr,
 ) -> Result<MethodResult, ()> {
     trace!(target: "lazymc", "Using forward method to occupy joining client");
 
@@ -24,6 +25,7 @@ pub async fn occupy(
         ProxyHeader::Proxy.not_none(config.join.forward.send_proxy_v2),
         config.join.forward.address,
         inbound_history.clone(),
+        client,
     );
 
     // TODO: do not consume, continue on proxy connect failure

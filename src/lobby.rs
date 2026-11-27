@@ -127,7 +127,7 @@ pub async fn serve(
             // Start new connection to server
             let server_client_info = client_info.clone();
             let (server_client, mut outbound, mut server_buf) =
-                connect_to_server(&server_client_info, &inbound, &config).await?;
+                connect_to_server(&server_client_info, &inbound, &config, client.peer).await?;
             let (returned_reader, returned_writer) = inbound.split();
             reader = returned_reader;
             writer = returned_writer;
@@ -358,10 +358,11 @@ async fn connect_to_server(
     client_info: &ClientInfo,
     inbound: &TcpStream,
     config: &Config,
+    client: std::net::SocketAddr,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
     time::timeout(
         SERVER_CONNECT_TIMEOUT,
-        connect_to_server_no_timeout(client_info, inbound, config),
+        connect_to_server_no_timeout(client_info, inbound, config, client),
     )
     .await
     .map_err(|_| {
@@ -377,6 +378,7 @@ async fn connect_to_server_no_timeout(
     client_info: &ClientInfo,
     inbound: &TcpStream,
     config: &Config,
+    client: std::net::SocketAddr,
 ) -> Result<(Client, TcpStream, BytesMut), ()> {
     // Open connection
     // TODO: on connect fail, ping server and redirect to serve_status if offline
@@ -388,7 +390,7 @@ async fn connect_to_server_no_timeout(
     if config.server.send_proxy_v2 {
         trace!(target: "lazymc::lobby", "Sending client proxy header for server connection");
         outbound
-            .write_all(&proxy::stream_proxy_header(inbound).map_err(|_| ())?)
+            .write_all(&proxy::stream_proxy_header(inbound, client).map_err(|_| ())?)
             .await
             .map_err(|_| ())?;
     }

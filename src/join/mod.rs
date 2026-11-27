@@ -56,13 +56,14 @@ pub async fn occupy(
                     server.clone(),
                     inbound,
                     &mut inbound_history,
+                    client.peer,
                 )
                 .await?
             }
 
             // Forward method, forward client connection while server starts
             Method::Forward => {
-                forward::occupy(config.clone(), inbound, &mut inbound_history).await?
+                forward::occupy(config.clone(), inbound, &mut inbound_history, client.peer).await?
             }
 
             // Lobby method, keep client in lobby while server starts
